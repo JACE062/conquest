@@ -1,0 +1,1 @@
+A recreation of the classic strategy video game Slay, made as an accessible, web-friendly version that follows the original rules without adding any unnecessary features or fluff, like some of the existing recreations do.
