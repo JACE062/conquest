@@ -12,6 +12,8 @@ There are 24 islands in four sizes. Standard is the default difficulty. You can 
 
 On a touch screen, tap a hex to select it, drag to pan, and pinch to zoom. **Fit** shows the entire island.
 
+In the web build, **End turn** saves a checkpoint in your browser before play passes to the other houses. Reloading the site in the same browser returns you to that point, with your moves still available to undo. Starting a new match clears the old checkpoint.
+
 ## Run from source
 
 Open `project.godot` in Godot 4.7.2 Standard and press **F5**. To make a Windows or Web build, install matching export templates and follow the [build instructions](docs/build.md).

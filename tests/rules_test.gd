@@ -42,6 +42,7 @@ func run_suite():
 	test_surrender()
 	await test_endgame_ui()
 	await test_end_turn_reminder()
+	test_checkpoint_history()
 	test_unit_selection()
 	await test_colors_and_territory()
 	await test_map_navigation()
@@ -415,6 +416,19 @@ func test_end_turn_reminder():
 	scene.refresh()
 	expect(scene.next_village_button.disabled,"Next village disables once no village has work")
 	scene.free()
+
+func test_checkpoint_history():
+	var g = line([tile(0,R.CAPITAL,25),tile(0),tile(0),tile(1),tile(1,R.CAPITAL)])
+	var history = [[g.cells.duplicate(true),x(0)]]
+	g.apply("recruit",x(0),x(1))
+	history.append([g.cells.duplicate(true),x(0)])
+	g.apply("move",x(1),x(2))
+	var checkpoint = preload("res://game/checkpoint.gd")
+	var undo = checkpoint.pack_history(history,g.cells)
+	var restored = checkpoint.unpack_history(bytes_to_var(var_to_bytes(undo)),g.cells)
+	expect(restored == history,"checkpoint restores the treasury, pieces and selections for each undo")
+	restored[0][0][x(0)].cash = 999
+	expect(g.cells[x(0)].cash != 999 and restored[1][0][x(0)].cash != 999,"restored undo snapshots are independent")
 
 func test_endgame_ui():
 	var scene = preload("res://game/main.gd").new()

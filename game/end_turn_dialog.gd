@@ -43,6 +43,7 @@ func _ready():
 func offer(message: String, cap: Vector2i):
 	summary.text = message
 	village = cap
+	show_button.visible = cap != preload("res://game/rules.gd").NONE
 	popup()
 	fit_dialog()
 	keep_button.grab_focus()

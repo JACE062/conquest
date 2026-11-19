@@ -4,6 +4,7 @@ const R = preload("res://game/rules.gd")
 const AI = preload("res://game/opponent.gd")
 const Island = preload("res://game/island.gd")
 const Board = preload("res://game/board.gd")
+const Checkpoint = preload("res://game/checkpoint.gd")
 const SERIF = preload("res://art/CrimsonText-Regular.ttf")
 const BANNER = preload("res://art/banner.svg")
 const PAPER = Color("#f1ead9")
@@ -61,7 +62,7 @@ func _ready():
 	build_ui()
 	get_window().size_changed.connect(portrait.adapt.bind(self))
 	portrait.adapt(self)
-	start()
+	start(Checkpoint.read())
 
 func label(parent, value: String, points: int, color: Color, serif = false) -> Label:
 	var node = Label.new()
@@ -392,7 +393,11 @@ func configure_dialogs():
 	result_dialog.custom_action.connect(func(_action): show_territory())
 	result_dialog.confirmed.connect(start)
 
-func start():
+func start(saved: Dictionary = {}):
+	if game:
+		Checkpoint.clear()
+	if not saved.is_empty():
+		active_island = saved.island
 	portrait.set_menu(false)
 	var layout = Island.MAPS[active_island]
 	board.house_ids = Island.house_colors_for_match(color_selector.get_selected_id(), board.house_ids)
@@ -411,8 +416,27 @@ func start():
 	board.cursor = selected
 	board.grab_focus()
 	status.text = "Tap Recruit to place a peasant." if portrait.active else "Select Recruit peasant, then choose a marked hex."
+	if not saved.is_empty():
+		game.restore(saved.cells)
+		game.round_number = saved.round
+		game.surrender_wait = saved.wait
+		board.house_ids = saved.houses
+		color_selector.select(board.house_ids[0])
+		difficulty_selector.select(difficulty_selector.get_item_index(saved.difficulty))
+		territory_graph.completed = saved.graph
+		history = Checkpoint.unpack_history(saved.undo,game.cells)
+		selected = saved.selected
+		source = saved.source
+		mode = saved.mode
+		board.cursor = saved.cursor
+		status.text = "Autosave restored. It’s still your turn."
 	refresh()
-	if portrait.active:
+	if not saved.is_empty():
+		await get_tree().process_frame
+		await get_tree().process_frame
+		board.zoom = saved.zoom
+		board.look_at_world(saved.center)
+	elif portrait.active:
 		portrait.frame_opening(self)
 
 func select_largest():
@@ -577,6 +601,12 @@ func request_end_turn():
 	if game.active != 0 or finished or surrender_pending or end_turn_dialog.visible:
 		return
 	var work = village_work()
+	var save_failed = false
+	if OS.has_feature("web"):
+		save_failed = not Checkpoint.write({"island":active_island,"houses":board.house_ids,
+			"difficulty":difficulty_selector.get_selected_id(),"cells":game.cells,"round":game.round_number,
+			"wait":game.surrender_wait,"graph":territory_graph.completed,"undo":Checkpoint.pack_history(history,game.cells),
+			"selected":selected,"source":source,"mode":mode,"cursor":board.cursor,"zoom":board.zoom,"center":board.view_center})
 	var funded = work.funded
 	var ready = work.ready
 	var reasons = PackedStringArray()
@@ -584,10 +614,13 @@ func request_end_turn():
 		reasons.append("1 village can afford a peasant." if funded == 1 else "%d villages can afford a peasant." % funded)
 	if ready:
 		reasons.append("1 unit is still ready." if ready == 1 else "%d units are still ready." % ready)
+	if save_failed:
+		reasons.append("Autosave failed. End turn anyway?")
 	if reasons.is_empty():
 		end_human_turn()
 		return
-	end_turn_dialog.offer("\n".join(reasons),next_eligible(work.villages))
+	var target = R.NONE if work.villages.is_empty() else next_eligible(work.villages)
+	end_turn_dialog.offer("\n".join(reasons),target)
 
 func show_reminder_village(cap: Vector2i):
 	clear_order()
@@ -648,6 +681,7 @@ func next_player():
 func check_result():
 	if not finished and game.owns_island(game.active):
 		finished = true
+		Checkpoint.clear()
 		result_dialog.title = "Island conquered" if game.active == 0 else "Defeat"
 		result_dialog.dialog_text = "House %s controls %s." % [house_name(game.active),active_island]
 		status.text = result_dialog.dialog_text
