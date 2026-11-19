@@ -24,17 +24,23 @@ var origin = Vector2.ZERO
 var zoom = 1.0
 var view_center = Vector2.ZERO # In axial_center units, independent of window size.
 var keyboard_cursor = false
+var portrait = false
+var touches = {}
+var touch_start = Vector2.ZERO
+var touch_moved = false
 
 func _ready():
 	focus_mode = Control.FOCUS_ALL
 	mouse_default_cursor_shape = Control.CURSOR_ARROW
 	clip_contents = true
 	resized.connect(update_view)
+	visibility_changed.connect(func(): if not is_visible_in_tree(): touches.clear())
 	mouse_exited.connect(func(): hover(R.NONE))
 	focus_entered.connect(update_inspection)
 	focus_exited.connect(update_inspection)
 
 func load_game(value):
+	touches.clear()
 	game = value
 	var first = true
 	for p in game.cells:
@@ -49,15 +55,24 @@ func fit_island():
 	update_view()
 
 func fit_radius() -> float:
+	if portrait:
+		return maxf(0.1,minf((size.x - 16) / (extent.size.x + sqrt(3.0)),(size.y - 16) / (extent.size.y + 2)))
 	return maxf(0.1, minf((size.x - 70) / (extent.size.x + sqrt(3.0)), (size.y - 96) / (extent.size.y + 2)))
+
+func zoom_limit() -> float:
+	return maxf(MAX_ZOOM,30.0 / fit_radius()) if portrait else MAX_ZOOM
 
 func update_view():
 	if not game or size.x <= 0 or size.y <= 0:
 		return
 	var fit = fit_radius()
+	zoom = minf(zoom,zoom_limit())
 	radius = fit * zoom
 	# Keep the viewport inside the original fit view and its center within the coasts.
 	var travel = ((size / fit - size / radius) * 0.5).min(extent.size * 0.5)
+	if portrait:
+		# At a coastal village keep the rest of the island in view.
+		travel = ((extent.size + Vector2(sqrt(3.0),2) - (size - Vector2(16,16)) / radius) * 0.5).max(Vector2.ZERO)
 	view_center = view_center.clamp(extent.get_center() - travel, extent.get_center() + travel)
 	origin = size * 0.5 - view_center * radius
 	if not keyboard_cursor:
@@ -69,7 +84,7 @@ func visible_world() -> Rect2:
 	return Rect2(-origin / radius,size / radius)
 
 func zoom_at(factor: float, anchor: Vector2):
-	var next_zoom = clampf(zoom * factor,1.0,MAX_ZOOM)
+	var next_zoom = clampf(zoom * factor,1.0,zoom_limit())
 	if is_equal_approx(zoom,next_zoom):
 		return
 	# Preserve the world point beneath the pointer unless the coast limits travel.
@@ -209,7 +224,37 @@ func hover(p, from_mouse = false):
 		update_inspection()
 
 func _gui_input(event):
-	if event is InputEventMouseMotion:
+	if event is InputEventScreenTouch:
+		if event.pressed:
+			if touches.is_empty():
+				touch_start = event.position
+				touch_moved = false
+			else:
+				touch_moved = true
+			touches[event.index] = event.position
+		elif touches.erase(event.index) and touches.is_empty() and not touch_moved and not event.canceled:
+			if touch_start.distance_to(event.position) <= 8 and Rect2(Vector2.ZERO,size).has_point(event.position):
+				pick_at(event.position)
+		accept_event()
+	elif event is InputEventScreenDrag and touches.has(event.index):
+		var old: Vector2 = touches[event.index]
+		touches[event.index] = event.position
+		if touches.size() == 1:
+			if touch_moved or touch_start.distance_to(event.position) > 8:
+				look_at_world(view_center - (event.position - old) / radius)
+				touch_moved = true
+		elif touches.size() == 2:
+			var ids = touches.keys()
+			var other: Vector2 = touches[ids[1] if ids[0] == event.index else ids[0]]
+			var distance = old.distance_to(other)
+			if distance > 0:
+				zoom_at(event.position.distance_to(other) / distance, (old + other) / 2)
+				look_at_world(view_center - (event.position - old) / (2 * radius))
+		accept_event()
+	elif event is InputEventMouse and event.device == InputEvent.DEVICE_ID_EMULATION:
+		# The native touch release above is the only event that places an order.
+		accept_event()
+	elif event is InputEventMouseMotion:
 		if event.button_mask & (MOUSE_BUTTON_MASK_MIDDLE | MOUSE_BUTTON_MASK_RIGHT):
 			look_at_world(view_center - event.relative / radius)
 			hover(hit(event.position),true)
@@ -231,12 +276,7 @@ func _gui_input(event):
 		hover(hit(event.position),true)
 		accept_event()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		var p = hit(event.position)
-		grab_focus()
-		hover(p, true)
-		if p != R.NONE:
-			cursor = p
-		picked.emit(p)
+		pick_at(event.position)
 		accept_event()
 	elif event is InputEventKey and event.pressed:
 		if event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
@@ -252,6 +292,7 @@ func _gui_input(event):
 			reveal_cursor()
 			update_inspection()
 			accept_event()
+
 		elif event.keycode in [KEY_ENTER,KEY_SPACE] and cursor != R.NONE:
 			if not event.echo:
 				keyboard_cursor = true
@@ -259,3 +300,11 @@ func _gui_input(event):
 				update_inspection()
 				picked.emit(cursor)
 			accept_event()
+
+func pick_at(local: Vector2):
+	var p = hit(local)
+	grab_focus()
+	hover(p,true)
+	if p != R.NONE:
+		cursor = p
+	picked.emit(p)

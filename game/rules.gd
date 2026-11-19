@@ -4,6 +4,7 @@ const Island = preload("res://game/island.gd")
 enum { EMPTY, PEASANT, SPEARMAN, KNIGHT, BARON, CAPITAL, CASTLE, PINE, PALM, GRAVE }
 const PIECES = ["Open land", "Peasant", "Spearman", "Knight", "Baron", "Capital", "Castle", "Pine", "Palm", "Grave"]
 const WAGES = [0, 2, 6, 18, 54]
+const RECRUIT_COST = 10
 const DIRS = [Vector2i(1,0), Vector2i(1,-1), Vector2i(0,-1), Vector2i(-1,0), Vector2i(-1,1), Vector2i(0,1)]
 const NONE = Vector2i(-999,-999)
 var cells: Dictionary
@@ -221,7 +222,7 @@ func legal(kind: String, source: Vector2i, target: Vector2i) -> bool:
 		return source == cap and from.cash >= 15 and capitals[target] == cap and to.piece == EMPTY
 	var rank = from.piece
 	if kind == "recruit":
-		if source != cap or from.cash < 10:
+		if source != cap or from.cash < RECRUIT_COST:
 			return false
 		rank = PEASANT
 	elif kind != "move" or not is_unit(rank) or from.spent:
@@ -263,7 +264,7 @@ func apply(kind: String, source: Vector2i, target: Vector2i) -> bool:
 			to.erase("breached")
 	var rank = from.piece
 	if kind == "recruit":
-		from.cash -= 10
+		from.cash -= RECRUIT_COST
 		rank = PEASANT
 	else:
 		from.piece = EMPTY

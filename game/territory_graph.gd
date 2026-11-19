@@ -10,6 +10,7 @@ var human = 0
 var metric = OptionButton.new()
 var description = Label.new()
 var plot = Control.new()
+var legend = GridContainer.new()
 var totals: Array[Label] = []
 
 func _ready():
@@ -35,7 +36,6 @@ func _ready():
 	var heading = Label.new()
 	heading.text = "Current hexes"
 	content.add_child(heading)
-	var legend = GridContainer.new()
 	legend.columns = 3
 	content.add_child(legend)
 	for house in Island.HOUSES:
@@ -56,12 +56,15 @@ func show_match(game, house_ids: Array, player: int):
 	houses = house_ids.duplicate()
 	human = player
 	min_size = Vector2i(720, 430).min(Vector2i(get_parent().get_viewport_rect().size * 0.9))
+	legend.columns = 2 if min_size.x < 480 else 3
 	update_chart()
 	popup_centered(min_size)
 
 func update_chart():
 	var counts = current[metric.selected]
 	description.text = "Hexes linked to a village, including woodland." if metric.selected == 0 else "Every colored land hex, including isolated hexes and woodland."
+	if legend.columns == 2:
+		description.text = "Village land, including woodland." if metric.selected == 0 else "All house land, including isolated hexes."
 	for seat in totals.size():
 		totals[seat].visible = seat < counts.size()
 		if seat < counts.size():

@@ -34,6 +34,7 @@ var wages_label: Label
 var recruit_button: Button
 var castle_button: Button
 var undo_button: Button
+var next_village_button: Button
 var end_button: Button
 var status: Label
 var tile_info: Label
@@ -45,17 +46,21 @@ var zoom_out: Button
 var zoom_in: Button
 var fit_button: Button
 var history_button: Button
-var help_dialog = AcceptDialog.new()
+var help_dialog = preload("res://game/help_dialog.gd").new()
 var restart_dialog = ConfirmationDialog.new()
+var end_turn_dialog = preload("res://game/end_turn_dialog.gd").new()
 var surrender_dialog = ConfirmationDialog.new()
 var result_dialog = AcceptDialog.new()
 var territory_graph = preload("res://game/territory_graph.gd").new()
 var finished = false
 var surrender_pending = false
 var delay = 0.0
+var portrait = preload("res://game/portrait_layout.gd").new()
 
 func _ready():
 	build_ui()
+	get_window().size_changed.connect(portrait.adapt.bind(self))
+	portrait.adapt(self)
 	start()
 
 func label(parent, value: String, points: int, color: Color, serif = false) -> Label:
@@ -186,8 +191,8 @@ func build_ui():
 	style_button(difficulty_selector,Color("#254247"),LIGHT,Color("#506565"))
 	difficulty_selector.custom_minimum_size.x = 115
 	difficulty.add_child(difficulty_selector)
-	button(header,"How to play",show_help,Color("#254247"),LIGHT,Color("#506565"))
-	button(header,"Restart",ask_restart,Color("#254247"),LIGHT,Color("#506565"))
+	var help = button(header,"How to play",show_help,Color("#254247"),LIGHT,Color("#506565"))
+	var restart = button(header,"Restart",ask_restart,Color("#254247"),LIGHT,Color("#506565"))
 	var body = row(root,0)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	var map = column(panel(body,Board.SEA,true),0)
@@ -241,7 +246,8 @@ func build_ui():
 	overview.gui_input.connect(navigate_overview)
 	overview.resized.connect(overview.queue_redraw)
 	rule(side)
-	build_standings(side)
+	var standings = column(side,6)
+	build_standings(standings)
 	rule(side)
 	holding_label = label(side,"",18,INK)
 	var treasury = row(side)
@@ -265,9 +271,16 @@ func build_ui():
 	for node in [recruit_button,castle_button]:
 		node.add_theme_constant_override("icon_max_width",32)
 	spacer(side,true)
-	undo_button = button(side,"Undo move",undo,Color("#e8e2d2"),INK,Color("#babaa5"),40)
+	var navigation = row(side,6)
+	next_village_button = button(navigation,"Next village",next_village,Color("#e8e2d2"),INK,Color("#babaa5"),44)
+	next_village_button.tooltip_text = "Find a village with a ready unit or enough coins to recruit."
+	undo_button = button(navigation,"Undo move",undo,Color("#e8e2d2"),INK,Color("#babaa5"),40)
+	for control in [next_village_button,undo_button]:
+		control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	history_button = button(side,"Territory history",show_territory,Color("#e8e2d2"),INK,Color("#babaa5"),40)
-	end_button = button(side,"End turn",end_human_turn,GOLD,INK,Color("#ad8d4d"),50)
+	end_button = button(side,"End turn",request_end_turn,GOLD,INK,Color("#ad8d4d"),50)
+	add_child(portrait)
+	portrait.setup(self,root,colors,difficulty,help,restart,standings)
 	configure_dialogs()
 
 func build_standings(side):
@@ -310,7 +323,7 @@ func zoom_from_center(factor: float):
 func update_view_controls():
 	zoom_out.disabled = is_equal_approx(board.zoom,1.0)
 	fit_button.disabled = zoom_out.disabled
-	zoom_in.disabled = is_equal_approx(board.zoom,Board.MAX_ZOOM)
+	zoom_in.disabled = is_equal_approx(board.zoom,board.zoom_limit())
 	overview.queue_redraw()
 
 func overview_transform() -> Transform2D:
@@ -352,34 +365,22 @@ func configure_dialogs():
 	add_child(territory_graph)
 	territory_graph.confirmed.connect(return_from_graph)
 	territory_graph.canceled.connect(return_from_graph)
-	for dialog in [help_dialog,restart_dialog,surrender_dialog,result_dialog]:
+	var shade = ColorRect.new()
+	shade.color = Color(0.05,0.12,0.13,0.46)
+	shade.hide()
+	add_child(shade)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(help_dialog)
+	add_child(end_turn_dialog)
+	for guide in [help_dialog,end_turn_dialog]:
+		guide.visibility_changed.connect(func(): shade.visible = help_dialog.visible or end_turn_dialog.visible)
+	for dialog in [restart_dialog,surrender_dialog,result_dialog]:
 		add_child(dialog)
 		dialog.exclusive = true
 		dialog.dialog_autowrap = true
-	help_dialog.title = "How to play"
-	var scroll = ScrollContainer.new()
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	help_dialog.add_child(scroll)
-	var help_text = Label.new()
-	help_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	help_text.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	scroll.add_child(help_text)
-	help_text.text = """Capture the island, one territory at a time. Easy villages save more coins and favor lightly defended land. Hard villages field larger armies and weigh possible counterattacks.
-
-Look for the gold Conquest flag in front of each of your villages. Select one to use its treasury. An isolated hex has no village or income. Join it to another friendly hex to bring it into a territory. The sidebar compares how many hexes each house has connected to villages. After the match, open Territory history to see how those totals changed.
-
-Scroll over the map to zoom at the pointer, or use the + and − buttons. Drag with the right or middle mouse button to pan. The frame on the minimap shows the visible area. Click or drag there to move the view. Fit returns to the whole island.
-
-Recruit a peasant onto friendly land, onto a friendly soldier to upgrade it, or directly onto an undefended border hex.
-
-A ready unit can reposition anywhere in its territory. Each placement releases the unit. Select it again to keep moving, or click a selected unit to put it down in place. To merge, select a ready unit and then a friendly soldier. Their combined rank can reach four. Capturing or clearing a tree spends the unit’s action. An attacker must exceed the strongest local defender. Capitals defend at rank one, castles at rank two.
-
-Each clear hex earns one coin per turn. Peasants, spearmen, knights and barons cost 2, 6, 18 and 54 in wages. A bankrupt territory loses all its troops. Capture a capital to destroy its treasury, or join two holdings to pool their money.
-
-End your turn with more than three times the tree-free land of your strongest rival to receive a surrender offer. You can accept or play for the whole island.
-
-Arrows, E and Z navigate the six hex directions. Enter selects. P recruits, C builds, U undoes, Escape cancels and N ends your turn. Tab reaches the controls."""
 	restart_dialog.confirmed.connect(confirm_new_match)
+	end_turn_dialog.confirmed.connect(end_human_turn)
+	end_turn_dialog.village_requested.connect(show_reminder_village)
 	restart_dialog.canceled.connect(show_active_island)
 	surrender_dialog.title = "The other houses offer to surrender"
 	surrender_dialog.ok_button_text = "Accept surrender"
@@ -392,6 +393,7 @@ Arrows, E and Z navigate the six hex directions. Enter selects. P recruits, C bu
 	result_dialog.confirmed.connect(start)
 
 func start():
+	portrait.set_menu(false)
 	var layout = Island.MAPS[active_island]
 	board.house_ids = Island.house_colors_for_match(color_selector.get_selected_id(), board.house_ids)
 	game = R.new_game(layout[0], layout[1])
@@ -408,8 +410,10 @@ func start():
 	select_largest()
 	board.cursor = selected
 	board.grab_focus()
-	status.text = "Select Recruit peasant, then choose a marked hex."
+	status.text = "Tap Recruit to place a peasant." if portrait.active else "Select Recruit peasant, then choose a marked hex."
 	refresh()
+	if portrait.active:
+		portrait.frame_opening(self)
 
 func select_largest():
 	selected = R.NONE
@@ -433,6 +437,7 @@ func refresh():
 	elif not finished and game.active != 0 and not game.can_take_turn(0):
 		turn_label.text = "SPECTATING"
 	house_label.text = "House " + house_name(game.active)
+	portrait.compact_turn.text = "%s · %d" % [turn_label.text,game.round_number]
 	var cap = selected if game.lands.has(selected) else R.NONE
 	var ledger = game.finances(cap)
 	var cash = game.cells[cap].cash if cap != R.NONE else 0
@@ -440,14 +445,18 @@ func refresh():
 	cash_label.text = "1 coin" if cash == 1 else "%d coins" % cash
 	income_label.text = "+%d" % ledger.x
 	wages_label.text = "−%d" % ledger.y if ledger.y > 0 else "0"
+	portrait.island_name.text = active_island
+	portrait.ledger.text = "%d hexes   Income +%d   Wages %s" % [game.lands.get(cap,[]).size(),ledger.x,wages_label.text]
 	var space = false
 	for p in game.lands.get(cap,[]):
 		if game.cells[p].piece == R.EMPTY:
 			space = true
 			break
-	recruit_button.disabled = not player or cash < 10 or game.targets("recruit", cap).is_empty()
+	recruit_button.disabled = not player or cash < R.RECRUIT_COST or game.targets("recruit", cap).is_empty()
 	castle_button.disabled = not player or cash < 15 or not space
 	undo_button.disabled = not player or history.is_empty()
+	next_village_button.disabled = not player or village_work().villages.is_empty()
+	next_village_button.visible = not finished
 	undo_button.visible = not finished
 	history_button.visible = finished
 	end_button.disabled = not player
@@ -521,7 +530,7 @@ func choose_purchase(kind, from_keyboard = false):
 		board.keyboard_cursor = true
 		board.reveal_cursor()
 	board.grab_focus()
-	status.text = "Choose a marked hex to deploy or combine your peasant." if kind == "recruit" else "Choose a marked open hex for your castle."
+	status.text = "Recruit on a marked hex." if kind == "recruit" else "Build on a marked hex."
 	refresh()
 
 func undo():
@@ -535,6 +544,63 @@ func undo():
 	board.grab_focus()
 	refresh()
 
+func village_work() -> Dictionary:
+	var funded = 0
+	var ready = 0
+	var villages: Array[Vector2i] = []
+	for cap in game.lands:
+		if game.cells[cap].owner != 0:
+			continue
+		var affordable = game.cells[cap].cash >= R.RECRUIT_COST
+		if affordable:
+			funded += 1
+		var ready_before = ready
+		for hex in game.lands[cap]:
+			var cell = game.cells[hex]
+			if R.is_unit(cell.piece) and not cell.spent:
+				ready += 1
+		if affordable or ready > ready_before:
+			villages.append(cap)
+	return {"villages":villages,"funded":funded,"ready":ready}
+
+func next_eligible(villages: Array) -> Vector2i:
+	return villages[(villages.find(selected) + 1) % villages.size()]
+
+func next_village():
+	if game.active != 0 or finished or surrender_pending:
+		return
+	var villages = village_work().villages
+	if not villages.is_empty():
+		show_reminder_village(next_eligible(villages))
+
+func request_end_turn():
+	if game.active != 0 or finished or surrender_pending or end_turn_dialog.visible:
+		return
+	var work = village_work()
+	var funded = work.funded
+	var ready = work.ready
+	var reasons = PackedStringArray()
+	if funded:
+		reasons.append("1 village can afford a peasant." if funded == 1 else "%d villages can afford a peasant." % funded)
+	if ready:
+		reasons.append("1 unit is still ready." if ready == 1 else "%d units are still ready." % ready)
+	if reasons.is_empty():
+		end_human_turn()
+		return
+	end_turn_dialog.offer("\n".join(reasons),next_eligible(work.villages))
+
+func show_reminder_village(cap: Vector2i):
+	clear_order()
+	selected = cap
+	board.cursor = cap
+	board.keyboard_cursor = true
+	board.zoom_at(maxf(1.0,25.0 / board.radius),board.size * 0.5)
+	board.look_at_world(board.axial_center(cap))
+	board.grab_focus()
+	board.update_inspection()
+	status.text = "Village selected. Choose a unit or place an order."
+	refresh()
+
 func end_human_turn():
 	if game.active != 0 or finished or surrender_pending:
 		return
@@ -543,7 +609,7 @@ func end_human_turn():
 		surrender_pending = true
 		clear_order()
 		refresh()
-		surrender_dialog.popup_centered(Vector2i(440,160))
+		show_dialog(surrender_dialog,Vector2i(440,160))
 		return
 	next_player()
 
@@ -585,9 +651,11 @@ func check_result():
 		result_dialog.title = "Island conquered" if game.active == 0 else "Defeat"
 		result_dialog.dialog_text = "House %s controls %s." % [house_name(game.active),active_island]
 		status.text = result_dialog.dialog_text
-		result_dialog.popup_centered(Vector2i(410,160))
+		show_dialog(result_dialog,Vector2i(410,160))
 
 func _process(delta):
+	if portrait.active and portrait.menu.visible:
+		return
 	if not game or game.active == 0 or finished or surrender_pending or help_dialog.visible or territory_graph.visible or restart_dialog.visible or island_selector.get_popup().visible or size_selector.get_popup().visible or color_selector.get_popup().visible:
 		return
 	delay -= delta
@@ -627,17 +695,21 @@ func show_territory():
 
 func return_from_graph():
 	if finished:
-		result_dialog.popup_centered.call_deferred(Vector2i(410,160))
+		show_dialog.call_deferred(result_dialog,Vector2i(410,160))
+
+func show_dialog(dialog, preferred: Vector2i):
+	var available = Vector2i(get_viewport_rect().size) - Vector2i(24,64)
+	dialog.popup_centered(preferred.min(available))
 
 func show_help():
-	help_dialog.popup_centered_clamped(Vector2i(800,650))
+	help_dialog.open_guide()
 
 func ask_restart():
 	requested_island = active_island
 	restart_dialog.title = "Restart %s?" % active_island
 	restart_dialog.dialog_text = "Start the island again from its opening position?"
 	restart_dialog.ok_button_text = "Restart"
-	restart_dialog.popup_centered(Vector2i(420,160))
+	show_dialog(restart_dialog,Vector2i(420,160))
 
 func show_active_island():
 	var island_size = Island.MAPS[active_island][2]
@@ -660,7 +732,7 @@ func choose_island(index: int):
 	restart_dialog.title = "Play %s?" % requested_island
 	restart_dialog.dialog_text = "Leave %s and start a new match on %s?" % [active_island,requested_island]
 	restart_dialog.ok_button_text = "Start match"
-	restart_dialog.popup_centered(Vector2i(420,160))
+	show_dialog(restart_dialog,Vector2i(420,160))
 
 func confirm_new_match():
 	active_island = requested_island
@@ -671,11 +743,16 @@ func _unhandled_key_input(event):
 		return
 	if event.ctrl_pressed or event.alt_pressed or event.meta_pressed:
 		return
+	if portrait.active and portrait.menu.visible:
+		if event.keycode == KEY_ESCAPE:
+			portrait.set_menu(false)
+			get_viewport().set_input_as_handled()
+		return
 	match event.keycode:
 		KEY_P: choose_purchase("recruit", true)
 		KEY_C: choose_purchase("build", true)
 		KEY_U: undo()
-		KEY_N: end_human_turn()
+		KEY_N: request_end_turn()
 		KEY_F1: show_help()
 		KEY_ESCAPE:
 			if game.active == 0 and not finished:

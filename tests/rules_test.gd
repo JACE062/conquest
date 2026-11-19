@@ -28,6 +28,8 @@ func _initialize():
 	run_suite.call_deferred()
 
 func run_suite():
+	# The headless display can start at 64 × 64. Desktop navigation tests use the game's desktop window.
+	root.size = Vector2i(1280,800)
 	test_opening()
 	test_opening_recruitment()
 	test_reed_sound_opening()
@@ -39,9 +41,11 @@ func run_suite():
 	test_elimination()
 	test_surrender()
 	await test_endgame_ui()
+	await test_end_turn_reminder()
 	test_unit_selection()
 	await test_colors_and_territory()
 	await test_map_navigation()
+	await test_portrait_play()
 	test_difficulty_selector()
 	await test_playable_islands()
 	test_opponent()
@@ -348,6 +352,70 @@ func test_surrender():
 	expect(g.owns_island(0) and g.cells[x(62)].piece != R.KNIGHT and g.cells[x(63)].piece != R.CASTLE, "acceptance transfers the island and removes enemy forces")
 	expect(g.cells[x(64)].piece == R.PINE and g.cells[x(65)].piece == R.GRAVE, "woods and graves survive the transfer")
 
+func test_end_turn_reminder():
+	var scene = preload("res://game/main.gd").new()
+	root.add_child(scene)
+	scene.set_process(false)
+	var g = line([tile(0,R.CAPITAL,9),tile(0),tile(1,R.CAPITAL,50),tile(1,R.KNIGHT),
+		tile(0,R.CAPITAL,10),tile(0,R.PEASANT)])
+	scene.game = g
+	scene.board.load_game(g)
+	scene.select_largest()
+	scene.refresh()
+	var prompt = scene.end_turn_dialog
+	scene.end_button.pressed.emit()
+	expect(prompt.visible and prompt.summary.text == "1 village can afford a peasant.\n1 unit is still ready.",
+		"end turn checks even the unselected village and ignores enemy troops and money")
+	prompt.keep_button.pressed.emit()
+	await process_frame
+	expect(not prompt.visible and g.active == 0 and g.cells[x(4)].cash == 10,"Keep playing preserves the turn")
+	g.cells[x(5)].spent = true
+	scene.request_end_turn()
+	expect(prompt.summary.text == "1 village can afford a peasant.","a spent unit gives no reminder")
+	prompt.keep_button.pressed.emit()
+	await process_frame
+	g.cells[x(4)].cash = 9
+	g.cells[x(5)].spent = false
+	var shortcut = InputEventKey.new()
+	shortcut.keycode = KEY_N
+	shortcut.pressed = true
+	scene._unhandled_key_input(shortcut)
+	expect(prompt.visible and prompt.summary.text == "1 unit is still ready.","keyboard end turn checks readiness independently of cash")
+	prompt.end_button.pressed.emit()
+	expect(not prompt.visible and g.active == 1,"End turn continues past the reminder")
+	g.active = 0
+	g.cells[x(5)].spent = true
+	scene.end_button.pressed.emit()
+	expect(not prompt.visible and g.active == 1,"end turn proceeds immediately when neither condition applies")
+	scene.active_island = "Osprey Sound"
+	scene.start()
+	for i in 3: await process_frame
+	scene.choose_purchase("recruit")
+	scene.request_end_turn()
+	var target = prompt.village
+	expect(target != scene.selected and scene.game.cells[target].owner == 0 and scene.game.cells[target].cash >= R.RECRUIT_COST,
+		"the extra-large opening offers another eligible village")
+	scene.board.zoom_at(4,scene.board.size * 0.5)
+	scene.board.look_at_world(scene.board.extent.end)
+	var previous = scene.game.cells.duplicate(true)
+	prompt.show_button.pressed.emit()
+	expect(not prompt.visible and scene.game.active == 0 and scene.selected == target and scene.board.selected_cap == target
+		and scene.board.hit(scene.board.center(target)) == target and scene.mode == "" and scene.game.cells == previous,
+		"Show village brings its capital into view, selects its treasury, and spends nothing")
+	var eligible = scene.village_work().villages
+	var visited = []
+	for i in eligible.size():
+		scene.next_village_button.pressed.emit()
+		visited.append(scene.selected)
+	expect(visited.size() > 1 and visited.all(func(cap): return visited.count(cap) == 1 and cap in eligible)
+		and scene.selected == target and not prompt.visible and scene.game.cells == previous,
+		"Next village visits each eligible holding and wraps without opening the reminder or spending coins")
+	for cap in eligible:
+		scene.game.cells[cap].cash = 0
+	scene.refresh()
+	expect(scene.next_village_button.disabled,"Next village disables once no village has work")
+	scene.free()
+
 func test_endgame_ui():
 	var scene = preload("res://game/main.gd").new()
 	root.add_child(scene)
@@ -560,6 +628,122 @@ func test_map_navigation():
 		scene.fit_button.pressed.emit()
 		expect(board.zoom == 1.0 and scene.overview_frame().is_equal_approx(whole_frame), "Fit restores the full minimap frame")
 	scene.free()
+
+func touch_board(board, index, at, pressed):
+	var event = InputEventScreenTouch.new()
+	event.index = index
+	event.position = at
+	event.pressed = pressed
+	board._gui_input(event)
+
+func drag_board(board, index, at):
+	var event = InputEventScreenDrag.new()
+	event.index = index
+	event.position = at
+	board._gui_input(event)
+
+func test_portrait_play():
+	var original_size = root.size
+	var scene = preload("res://game/main.tscn").instantiate()
+	root.add_child(scene)
+	scene.set_process(false)
+	root.size = Vector2i(360,640)
+	scene.active_island = "Osprey Sound"
+	scene.start()
+	for frame in 5:
+		await process_frame
+	var board = scene.board
+	var game = scene.game
+	var screen = scene.get_viewport_rect()
+	expect(scene.portrait.active and board.size.x >= screen.size.x - 2, "portrait uses the full board width")
+	expect(board.radius >= 22 and board.hit(board.center(scene.selected)) == scene.selected,
+		"an extra-large portrait opening frames the player's village with selectable hexes")
+	for control in [board,scene.recruit_button,scene.end_button,scene.portrait.menu_button]:
+		expect(screen.encloses(control.get_global_rect()),"portrait controls fit on a short phone")
+	scene.choose_purchase("recruit")
+	for bounds in [Vector2i(540,548),Vector2i(768,1024),Vector2i(1024,768),Vector2i(720,720),Vector2i(600,540),Vector2i(360,365)]:
+		root.size = bounds
+		for frame in 4:
+			await process_frame
+		var area = scene.get_viewport_rect()
+		expect(scene.portrait.compact and board.size.x >= area.size.x - 1 and board.size.y >= area.size.y * (0.45 if bounds.x < 400 else 0.58),
+			"a near-square board keeps room for play at %s" % bounds)
+		for control in [scene.overview,scene.recruit_button,scene.castle_button,scene.undo_button,scene.end_button,scene.portrait.menu_button]:
+			expect(control.is_visible_in_tree() and area.encloses(control.get_global_rect()),"compact controls fit at %s" % bounds)
+		expect(scene.recruit_button.global_position.y == scene.end_button.global_position.y and scene.mode == "recruit",
+			"resizing preserves the order and puts all actions on one row")
+	scene.portrait.menu_button.pressed.emit()
+	root.size = Vector2i(360,640)
+	for frame in 4:
+		await process_frame
+	expect(not scene.portrait.compact and scene.portrait.menu.visible and scene.island_selector.is_visible_in_tree(),
+		"folding to a tall screen keeps the menu open")
+	scene.portrait.menu_button.pressed.emit()
+	for frame in 3:
+		await process_frame
+	var at = board.center(scene.selected)
+	var before = board.view_center
+	touch_board(board,0,at,true)
+	drag_board(board,0,at + Vector2(60,30))
+	touch_board(board,0,at + Vector2(60,30),false)
+	expect(not before.is_equal_approx(board.view_center) and scene.mode == "recruit" and scene.history.is_empty(),
+		"dragging the board pans without placing the pending recruit")
+	var previous_zoom = board.zoom
+	at = board.size * 0.5
+	touch_board(board,0,at,true)
+	touch_board(board,1,at + Vector2(30,0),true)
+	drag_board(board,1,at + Vector2(60,0))
+	touch_board(board,1,at + Vector2(60,0),false)
+	touch_board(board,0,at,false)
+	expect(board.zoom > previous_zoom and scene.mode == "recruit" and scene.history.is_empty(),
+		"pinching zooms without buying or canceling an order")
+	var target = board.legal_tiles.keys()[0]
+	board.look_at_world(board.axial_center(target))
+	at = board.center(target)
+	touch_board(board,0,at,true)
+	touch_board(board,0,at,false)
+	expect(scene.history.size() == 1 and scene.source == R.NONE, "a single tap places one recruit")
+	scene.portrait.menu_button.pressed.emit()
+	expect(scene.island_selector.is_visible_in_tree() and scene.land_bars[0].is_visible_in_tree(), "the portrait menu exposes island selection and standings")
+	scene.show_help()
+	for frame in 3:
+		await process_frame
+	expect(scene.help_dialog.size.x <= screen.size.x and scene.help_dialog.size.y <= screen.size.y,
+		"the first opening of How to play fits a portrait screen")
+	var tabs = scene.help_dialog.tabs
+	tabs.current_tab = 1
+	for frame in 2:
+		await process_frame
+	var upkeep = tabs.get_current_tab_control()
+	var table = upkeep.find_children("*","GridContainer",true,false)[0]
+	for rank in range(R.PEASANT,R.BARON + 1):
+		var unit = table.get_child(rank * 3).get_child(1)
+		var cost = table.get_child(rank * 3 + 2)
+		expect(unit.text == R.PIECES[rank] and cost.text == str(R.WAGES[rank]) and upkeep.get_global_rect().encloses(cost.get_global_rect()),
+			"the portrait upkeep table shows %s and its actual wages" % R.PIECES[rank])
+	tabs.current_tab = 2
+	expect(not upkeep.visible and tabs.get_current_tab_control().name == &"Controls","controls open on their own page")
+	scene.help_dialog.hide()
+	scene.show_help()
+	expect(tabs.current_tab == 0,"reopening How to play starts on the rules")
+	scene.help_dialog.hide()
+	var graph = scene.territory_graph
+	graph.show_match(game,board.house_ids,0)
+	graph.metric.select(1)
+	graph.update_chart()
+	for frame in 3:
+		await process_frame
+	expect(Rect2(Vector2.ZERO,graph.size).encloses(graph.totals.back().get_global_rect()),
+		"all six houses fit in the portrait history legend")
+	graph.hide()
+	root.size = Vector2i(1280,800)
+	for frame in 3:
+		await process_frame
+	expect(not scene.portrait.active and scene.game == game and scene.undo_button.is_visible_in_tree()
+		and scene.history.size() == 1 and scene.overview.is_visible_in_tree(), "rotation restores the desktop controls and preserves undo")
+	scene.undo()
+	scene.free()
+	root.size = original_size
 
 func test_colors_and_territory():
 	var scene = preload("res://game/main.gd").new()
