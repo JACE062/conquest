@@ -1,0 +1,360 @@
+position,game,order,action,source_hex,piece_used,target_hex,target_owner_before,target_piece_before,defense_before_capture,result_piece
+d11p4siege400,Windows,1,Place,,,237,Enemy,Open,0,Spearman
+d11p4siege400,Windows,2,Place,,,387,Enemy,Peasant,1,Spearman
+d11p4siege400,Windows,3,Place,,,405,Enemy,Palm,0,Peasant
+d11p4siege400,Windows,4,Place,,,318,Friendly,Open,,Peasant
+d11p4siege400,Windows,5,Place,,,503,Friendly,Open,,Peasant
+d11p4siege400,Windows,6,Place,,,486,Friendly,Open,,Peasant
+d11p4siege400,Windows,7,Place,,,451,Friendly,Open,,Peasant
+d11p4siege400,Windows,8,Place,,,434,Friendly,Open,,Peasant
+d11p4siege400,Windows,9,Place,,,554,Enemy,Knight,3,Baron
+d11p4siege400,Windows,10,Place,,,537,Enemy,Open,2,Knight
+d11p4siege400,Windows,11,Place,,,536,Enemy,Open,2,Knight
+d11p4siege400,Windows,12,Place,,,519,Enemy,Spearman,2,Knight
+d11p4siege400,Windows,13,Place,,,553,Enemy,Open,1,Spearman
+d11p4siege400,Windows,14,Place,,,535,Enemy,Open,1,Spearman
+d11p4siege400,Windows,15,Place,,,517,Enemy,Open,0,Peasant
+d11p4siege400,Windows,16,Place,,,482,Enemy,Open,0,Peasant
+d11p4siege400,Windows,17,Place,,,465,Enemy,Open,0,Peasant
+d11p4siege400,Windows,18,Place,,,447,Enemy,Open,0,Peasant
+d11p4siege400,Windows,19,Place,,,430,Enemy,Open,0,Peasant
+d11p4siege400,Windows,20,Place,,,448,Enemy,Open,0,Peasant
+d11p4siege400,Windows,21,Place,,,413,Enemy,Open,0,Peasant
+d11p4siege400,Windows,22,Place,,,395,Enemy,Open,0,Peasant
+d11p4siege400,Conquest,1,Move,422,Spearman,249,Enemy,Capital,1,Spearman
+d11p4siege400,Conquest,2,Merge,283,Peasant,317,Friendly,Peasant,,Spearman
+d11p4siege400,Conquest,3,Move,317,Spearman,302,Enemy,Capital,1,Spearman
+d11p4siege400,Conquest,4,Move,202,Spearman,220,Enemy,Open,0,Spearman
+d11p4siege400,Conquest,5,Merge,607,Knight,624,Friendly,Peasant,,Baron
+d11p4siege400,Conquest,6,Move,624,Baron,554,Enemy,Knight,3,Baron
+d11p4siege400,Conquest,7,Merge,329,Peasant,364,Friendly,Peasant,,Spearman
+d11p4siege400,Conquest,8,Move,364,Spearman,485,Enemy,Palm,1,Spearman
+d11p4siege400,Conquest,9,Merge,451,Peasant,503,Friendly,Peasant,,Spearman
+d11p4siege400,Conquest,10,Move,503,Spearman,450,Enemy,Capital,1,Spearman
+d26p5guard,Windows,1,Place,,,324,Enemy,Castle,2,Knight
+d26p5guard,Windows,2,Place,,,364,Enemy,Peasant,1,Spearman
+d26p5guard,Windows,3,Place,,,347,Enemy,Capital,1,Spearman
+d26p5guard,Windows,4,Place,,,342,Enemy,Open,0,Peasant
+d26p5guard,Windows,5,Place,,,379,Enemy,Open,1,Spearman
+d26p5guard,Windows,6,Place,,,344,Enemy,Capital,1,Spearman
+d26p5guard,Windows,7,Place,,,362,Enemy,Open,1,Spearman
+d26p5guard,Windows,8,Place,,,327,Enemy,Palm,0,Peasant
+d26p5guard,Windows,9,Place,,,289,Enemy,Open,0,Peasant
+d26p5guard,Windows,10,Place,,,428,Enemy,Open,2,Knight
+d26p5guard,Windows,11,Place,,,254,Enemy,Open,0,Peasant
+d26p5guard,Conquest,1,Move,654,Knight,324,Enemy,Castle,2,Knight
+d26p5guard,Conquest,2,Move,639,Spearman,306,Enemy,Open,1,Spearman
+d26p5guard,Conquest,3,Move,399,Spearman,364,Enemy,Peasant,1,Spearman
+d26p5guard,Conquest,4,Move,656,Spearman,347,Enemy,Capital,1,Spearman
+d26p5guard,Conquest,5,Move,671,Spearman,329,Enemy,Capital,1,Spearman
+d26p5guard,Conquest,6,Move,706,Spearman,289,Enemy,Open,1,Spearman
+d26p5guard,Conquest,7,Move,467,Peasant,254,Enemy,Palm,0,Peasant
+d26p5guard,Conquest,8,Merge,620,Peasant,691,Friendly,Peasant,,Spearman
+d26p5guard,Conquest,9,Move,691,Spearman,323,Enemy,Open,1,Spearman
+d26p5guard,Conquest,10,Move,619,Peasant,305,Enemy,Open,0,Peasant
+d26p5guard,Conquest,11,Move,689,Peasant,322,Enemy,Open,0,Peasant
+d26p5guard,Conquest,12,Buy upgrade,430,Peasant,636,Friendly,Peasant,,Spearman
+d26p5guard,Conquest,13,Move,636,Spearman,287,Enemy,Capital,1,Spearman
+d26p5guard,Conquest,14,Build castle,430,,397,Friendly,Open,,Castle
+d26p5guard,Conquest,15,Recruit,430,Peasant,288,Enemy,Open,0,Peasant
+d26p5lean,Windows,1,Place,,,324,Enemy,Castle,2,Knight
+d26p5lean,Windows,2,Place,,,342,Enemy,Open,0,Peasant
+d26p5lean,Windows,3,Place,,,289,Enemy,Open,0,Peasant
+d26p5lean,Windows,4,Place,,,428,Enemy,Open,2,Knight
+d26p5lean,Windows,5,Place,,,379,Enemy,Open,1,Spearman
+d26p5lean,Windows,6,Place,,,362,Enemy,Open,1,Spearman
+d26p5lean,Windows,7,Place,,,254,Enemy,Open,0,Peasant
+d26p5lean,Conquest,1,Move,399,Knight,324,Enemy,Castle,2,Knight
+d26p5lean,Conquest,2,Merge,467,Peasant,639,Friendly,Peasant,,Spearman
+d26p5lean,Conquest,3,Move,639,Spearman,306,Enemy,Open,1,Spearman
+d26p5lean,Conquest,4,Merge,620,Peasant,619,Friendly,Peasant,,Spearman
+d26p5lean,Conquest,5,Move,619,Spearman,364,Enemy,Peasant,1,Spearman
+d26p5lean,Conquest,6,Buy upgrade,430,Peasant,636,Friendly,Peasant,,Spearman
+d26p5lean,Conquest,7,Move,636,Spearman,347,Enemy,Capital,1,Spearman
+d26p5lean,Conquest,8,Build castle,430,,397,Friendly,Open,,Castle
+d26p5lean,Conquest,9,Recruit,430,Peasant,288,Enemy,Open,0,Peasant
+d26p5lean,Conquest,10,Recruit,430,Peasant,305,Enemy,Open,0,Peasant
+d26p5lean,Conquest,11,Recruit,430,Peasant,322,Enemy,Open,0,Peasant
+d26p5lean,Conquest,12,Recruit,430,Peasant,342,Enemy,Open,0,Peasant
+d28p5lean,Windows,1,Place,,,375,Enemy,Grave,1,Knight
+d28p5lean,Windows,2,Place,,,379,Enemy,Open,1,Spearman
+d28p5lean,Windows,3,Place,,,306,Enemy,Open,0,Knight
+d28p5lean,Windows,4,Place,,,289,Enemy,Open,0,Peasant
+d28p5lean,Windows,5,Place,,,288,Enemy,Open,0,Peasant
+d28p5lean,Windows,6,Place,,,323,Enemy,Open,1,Spearman
+d28p5lean,Conquest,1,Move,311,Knight,357,Enemy,Open,1,Knight
+d28p5lean,Conquest,2,Merge,329,Peasant,312,Friendly,Peasant,,Spearman
+d28p5lean,Conquest,3,Move,312,Spearman,340,Enemy,Capital,1,Spearman
+d28p5lean,Conquest,4,Merge,364,Peasant,342,Friendly,Peasant,,Spearman
+d28p5lean,Conquest,5,Move,342,Spearman,305,Enemy,Capital,1,Spearman
+d28p5lean,Conquest,6,Buy upgrade,430,Peasant,324,Friendly,Peasant,,Spearman
+d28p5lean,Conquest,7,Move,324,Spearman,306,Enemy,Capital,1,Spearman
+d28p5lean,Conquest,8,Build castle,430,,397,Friendly,Open,,Castle
+d28p5lean,Conquest,9,Recruit,430,Peasant,288,Enemy,Open,0,Peasant
+d28p5lean,Conquest,10,Recruit,430,Peasant,289,Enemy,Open,0,Peasant
+d28p5lean,Conquest,11,Recruit,430,Peasant,374,Enemy,Open,0,Peasant
+d28p5lean,Conquest,12,Recruit,430,Peasant,356,Enemy,Open,0,Peasant
+d28p5purse,Windows,1,Place,,,375,Enemy,Grave,1,Knight
+d28p5purse,Windows,2,Place,,,376,Enemy,Knight,3,Baron
+d28p5purse,Windows,3,Place,,,374,Enemy,Open,0,Peasant
+d28p5purse,Windows,4,Place,,,306,Enemy,Open,0,Peasant
+d28p5purse,Windows,5,Place,,,356,Enemy,Open,0,Peasant
+d28p5purse,Windows,6,Place,,,373,Enemy,Open,0,Peasant
+d28p5purse,Windows,7,Place,,,355,Enemy,Open,0,Peasant
+d28p5purse,Windows,8,Place,,,288,Enemy,Open,0,Peasant
+d28p5purse,Windows,9,Place,,,358,Enemy,Open,1,Spearman
+d28p5purse,Windows,10,Place,,,323,Enemy,Open,1,Spearman
+d28p5purse,Windows,11,Place,,,379,Enemy,Open,1,Spearman
+d28p5purse,Windows,12,Place,,,357,Enemy,Open,1,Spearman
+d28p5purse,Windows,13,Place,,,340,Enemy,Capital,1,Spearman
+d28p5purse,Windows,14,Place,,,305,Enemy,Open,1,Spearman
+d28p5purse,Windows,15,Place,,,322,Enemy,Open,1,Spearman
+d28p5purse,Windows,16,Place,,,362,Enemy,Open,1,Spearman
+d28p5purse,Windows,17,Place,,,289,Enemy,Open,0,Peasant
+d28p5purse,Conquest,1,Merge,311,Knight,329,Friendly,Peasant,,Baron
+d28p5purse,Conquest,2,Move,329,Baron,358,Enemy,Open,3,Baron
+d28p5purse,Conquest,3,Merge,312,Peasant,364,Friendly,Peasant,,Spearman
+d28p5purse,Conquest,4,Move,364,Spearman,340,Enemy,Capital,1,Spearman
+d28p5purse,Conquest,5,Merge,342,Peasant,324,Friendly,Peasant,,Spearman
+d28p5purse,Conquest,6,Move,324,Spearman,305,Enemy,Capital,1,Spearman
+d28p5purse,Conquest,7,Recruit,430,Peasant,374,Enemy,Open,0,Peasant
+d28p5purse,Conquest,8,Build castle,430,,392,Friendly,Open,,Castle
+d28p5purse,Conquest,9,Build castle,430,,397,Friendly,Open,,Castle
+d28p5purse,Conquest,10,Recruit,430,Peasant,375,Enemy,Grave,0,Peasant
+d28p5purse,Conquest,11,Recruit,430,Peasant,356,Enemy,Open,0,Peasant
+d28p5purse,Conquest,12,Recruit,430,Peasant,373,Enemy,Open,0,Peasant
+d28p5purse,Conquest,13,Recruit,430,Peasant,355,Enemy,Open,0,Peasant
+d28p5purse,Conquest,14,Recruit,430,Peasant,341,Friendly,Open,,Peasant
+d28p5purse,Conquest,15,Buy upgrade,430,Peasant,341,Friendly,Peasant,,Spearman
+d28p5purse,Conquest,16,Move,341,Spearman,322,Enemy,Capital,1,Spearman
+d28p5purse,Conquest,17,Recruit,430,Peasant,357,Enemy,Open,0,Peasant
+d28p5purse,Conquest,18,Recruit,430,Peasant,341,Friendly,Open,,Peasant
+d28p5purse,Conquest,19,Buy upgrade,430,Peasant,341,Friendly,Peasant,,Spearman
+d28p5purse,Conquest,20,Move,341,Spearman,306,Enemy,Capital,1,Spearman
+d28p5purse,Conquest,21,Recruit,430,Peasant,289,Enemy,Open,0,Peasant
+d28p5purse,Conquest,22,Recruit,430,Peasant,324,Friendly,Open,,Peasant
+d28p5purse,Conquest,23,Buy upgrade,430,Peasant,324,Friendly,Peasant,,Spearman
+d28p5purse,Conquest,24,Move,324,Spearman,288,Enemy,Capital,1,Spearman
+d28p5purse,Conquest,25,Recruit,430,Peasant,323,Enemy,Open,0,Peasant
+d28p5purse,Conquest,26,Recruit,430,Peasant,324,Friendly,Open,,Peasant
+d28p5purse,Conquest,27,Buy upgrade,430,Peasant,324,Friendly,Peasant,,Spearman
+d28p5purse,Conquest,28,Move,324,Spearman,287,Enemy,Capital,1,Spearman
+d28p5purse,Conquest,29,Recruit,430,Peasant,304,Enemy,Open,0,Peasant
+d28p5purse,Conquest,30,Recruit,430,Peasant,341,Friendly,Open,,Peasant
+d28p5purse,Conquest,31,Buy upgrade,430,Peasant,341,Friendly,Peasant,,Spearman
+d28p5purse,Conquest,32,Move,341,Spearman,337,Enemy,Grave,1,Spearman
+d29p5lean,Windows,1,Place,,,237,Enemy,Castle,2,Knight
+d29p5lean,Windows,2,Place,,,219,Enemy,Open,0,Peasant
+d29p5lean,Windows,3,Place,,,305,Enemy,Open,1,Knight
+d29p5lean,Windows,4,Place,,,379,Enemy,Open,1,Spearman
+d29p5lean,Windows,5,Place,,,272,Enemy,Open,1,Spearman
+d29p5lean,Windows,6,Place,,,184,Enemy,Open,0,Peasant
+d29p5lean,Windows,7,Place,,,167,Enemy,Open,0,Peasant
+d29p5lean,Windows,8,Place,,,150,Enemy,Open,0,Peasant
+d29p5lean,Windows,9,Place,,,410,Friendly,Open,,Peasant
+d29p5lean,Conquest,1,Move,254,Knight,237,Enemy,Castle,2,Knight
+d29p5lean,Conquest,2,Merge,289,Peasant,306,Friendly,Peasant,,Spearman
+d29p5lean,Conquest,3,Move,306,Spearman,255,Enemy,Peasant,1,Spearman
+d29p5lean,Conquest,4,Merge,288,Peasant,312,Friendly,Peasant,,Spearman
+d29p5lean,Conquest,5,Move,312,Spearman,220,Enemy,Peasant,1,Spearman
+d29p5lean,Conquest,6,Move,311,Peasant,203,Enemy,Open,0,Peasant
+d29p5lean,Conquest,7,Build castle,430,,397,Friendly,Open,,Castle
+d29p5lean,Conquest,8,Recruit,430,Peasant,185,Enemy,Open,0,Peasant
+d29p5lean,Conquest,9,Recruit,430,Peasant,150,Enemy,Open,0,Peasant
+d29p5lean,Conquest,10,Recruit,430,Peasant,272,Enemy,Open,0,Peasant
+d29p5lean,Conquest,11,Recruit,430,Peasant,254,Friendly,Open,,Peasant
+d29p5lean,Conquest,12,Buy upgrade,430,Peasant,254,Friendly,Peasant,,Spearman
+d29p5lean,Conquest,13,Move,254,Spearman,168,Enemy,Open,1,Spearman
+d29p5lean,Conquest,14,Recruit,430,Peasant,254,Friendly,Open,,Peasant
+d29p5lean,Conquest,15,Buy upgrade,430,Peasant,254,Friendly,Peasant,,Spearman
+d29p5lean,Conquest,16,Move,254,Spearman,151,Enemy,Capital,1,Spearman
+d29p5purse,Windows,1,Place,,,237,Enemy,Castle,2,Knight
+d29p5purse,Windows,2,Place,,,219,Enemy,Open,0,Peasant
+d29p5purse,Windows,3,Place,,,305,Enemy,Open,1,Knight
+d29p5purse,Windows,4,Place,,,357,Enemy,Knight,3,Baron
+d29p5purse,Windows,5,Place,,,379,Enemy,Open,1,Spearman
+d29p5purse,Windows,6,Place,,,272,Enemy,Open,1,Spearman
+d29p5purse,Windows,7,Place,,,362,Enemy,Open,1,Spearman
+d29p5purse,Windows,8,Place,,,202,Enemy,Open,1,Spearman
+d29p5purse,Windows,9,Place,,,184,Enemy,Open,0,Peasant
+d29p5purse,Windows,10,Place,,,167,Enemy,Open,0,Peasant
+d29p5purse,Windows,11,Place,,,185,Enemy,Open,1,Spearman
+d29p5purse,Windows,12,Place,,,150,Enemy,Open,0,Peasant
+d29p5purse,Conquest,1,Merge,254,Knight,289,Friendly,Peasant,,Baron
+d29p5purse,Conquest,2,Move,289,Baron,322,Enemy,Capital,3,Baron
+d29p5purse,Conquest,3,Merge,306,Peasant,288,Friendly,Peasant,,Spearman
+d29p5purse,Conquest,4,Move,288,Spearman,287,Enemy,Capital,1,Spearman
+d29p5purse,Conquest,5,Merge,312,Peasant,311,Friendly,Peasant,,Spearman
+d29p5purse,Conquest,6,Buy upgrade,430,Peasant,311,Friendly,Spearman,,Knight
+d29p5purse,Conquest,7,Move,311,Knight,237,Enemy,Castle,2,Knight
+d29p5purse,Conquest,8,Build castle,430,,397,Friendly,Open,,Castle
+d29p5purse,Conquest,9,Recruit,430,Peasant,219,Enemy,Open,0,Peasant
+d29p5purse,Conquest,10,Recruit,430,Peasant,184,Enemy,Open,0,Peasant
+d29p5purse,Conquest,11,Recruit,430,Peasant,167,Enemy,Open,0,Peasant
+d29p5purse,Conquest,12,Recruit,430,Peasant,150,Enemy,Open,0,Peasant
+d29p5purse,Conquest,13,Recruit,430,Peasant,305,Enemy,Open,0,Peasant
+d29p5purse,Conquest,14,Recruit,430,Peasant,304,Enemy,Open,0,Peasant
+d29p5purse,Conquest,15,Recruit,430,Peasant,254,Friendly,Open,,Peasant
+d29p5purse,Conquest,16,Buy upgrade,430,Peasant,254,Friendly,Peasant,,Spearman
+d29p5purse,Conquest,17,Move,254,Spearman,255,Enemy,Peasant,1,Spearman
+d29p5purse,Conquest,18,Recruit,430,Peasant,272,Enemy,Open,0,Peasant
+d29p5purse,Conquest,19,Recruit,430,Peasant,254,Friendly,Open,,Peasant
+d29p5purse,Conquest,20,Buy upgrade,430,Peasant,254,Friendly,Peasant,,Spearman
+d29p5purse,Conquest,21,Move,254,Spearman,168,Enemy,Open,1,Spearman
+d29p5purse,Conquest,22,Recruit,430,Peasant,254,Friendly,Open,,Peasant
+d29p5purse,Conquest,23,Buy upgrade,430,Peasant,254,Friendly,Peasant,,Spearman
+d29p5purse,Conquest,24,Move,254,Spearman,151,Enemy,Capital,1,Spearman
+d29p5purse,Conquest,25,Recruit,430,Peasant,133,Enemy,Open,0,Peasant
+d29p5purse,Conquest,26,Recruit,430,Peasant,254,Friendly,Open,,Peasant
+d29p5purse,Conquest,27,Buy upgrade,430,Peasant,254,Friendly,Peasant,,Spearman
+d29p5purse,Conquest,28,Move,254,Spearman,220,Enemy,Peasant,1,Spearman
+d29p5purse,Conquest,29,Recruit,430,Peasant,185,Enemy,Open,0,Peasant
+d29p5purse,Conquest,30,Recruit,430,Peasant,202,Enemy,Open,0,Peasant
+d29p5purse,Conquest,31,Recruit,430,Peasant,254,Friendly,Open,,Peasant
+d29p5purse,Conquest,32,Recruit,430,Peasant,289,Friendly,Open,,Peasant
+d30p5lean2,Windows,1,Place,,,220,Enemy,Peasant,1,Spearman
+d30p5lean2,Windows,2,Place,,,344,Enemy,Capital,1,Spearman
+d30p5lean2,Windows,3,Place,,,202,Enemy,Open,0,Peasant
+d30p5lean2,Windows,4,Place,,,185,Enemy,Open,0,Peasant
+d30p5lean2,Windows,5,Place,,,203,Enemy,Open,0,Peasant
+d30p5lean2,Windows,6,Place,,,362,Enemy,Open,1,Spearman
+d30p5lean2,Windows,7,Place,,,327,Enemy,Palm,0,Peasant
+d30p5lean2,Windows,8,Place,,,168,Enemy,Open,1,Spearman
+d30p5lean2,Windows,9,Place,,,151,Enemy,Capital,1,Spearman
+d30p5lean2,Windows,10,Place,,,133,Enemy,Open,0,Peasant
+d30p5lean2,Windows,11,Place,,,305,Enemy,Open,1,Knight
+d30p5lean2,Windows,12,Place,,,238,Enemy,Capital,2,Knight
+d30p5lean2,Windows,13,Place,,,410,Friendly,Open,,Peasant
+d30p5lean2,Conquest,1,Move,255,Spearman,344,Enemy,Capital,1,Spearman
+d30p5lean2,Conquest,2,Move,272,Spearman,327,Enemy,Capital,1,Spearman
+d30p5lean2,Conquest,3,Move,306,Spearman,168,Enemy,Open,1,Spearman
+d30p5lean2,Conquest,4,Move,288,Spearman,151,Enemy,Capital,1,Spearman
+d30p5lean2,Conquest,5,Move,150,Knight,238,Enemy,Capital,2,Knight
+d30p5lean2,Conquest,6,Merge,167,Peasant,184,Friendly,Peasant,,Spearman
+d30p5lean2,Conquest,7,Move,184,Spearman,185,Enemy,Capital,1,Spearman
+d30p5lean2,Conquest,8,Merge,219,Peasant,237,Friendly,Peasant,,Spearman
+d30p5lean2,Conquest,9,Move,237,Spearman,203,Enemy,Capital,1,Spearman
+d30p5lean2,Conquest,10,Buy upgrade,430,Peasant,254,Friendly,Peasant,,Spearman
+d30p5lean2,Conquest,11,Move,254,Spearman,202,Enemy,Capital,1,Spearman
+d30p5lean2,Conquest,12,Recruit,430,Peasant,133,Enemy,Open,0,Peasant
+d30p5lean2,Conquest,13,Recruit,430,Peasant,362,Enemy,Open,0,Peasant
+d30p5lean2,Conquest,14,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5lean2,Conquest,15,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5lean2,Conquest,16,Move,150,Spearman,220,Enemy,Peasant,1,Spearman
+d30p5lean2,Conquest,17,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Windows,1,Place,,,220,Enemy,Peasant,1,Spearman
+d30p5purse,Windows,2,Place,,,344,Enemy,Capital,1,Spearman
+d30p5purse,Windows,3,Place,,,202,Enemy,Open,0,Peasant
+d30p5purse,Windows,4,Place,,,185,Enemy,Open,0,Peasant
+d30p5purse,Windows,5,Place,,,203,Enemy,Open,0,Peasant
+d30p5purse,Windows,6,Place,,,362,Enemy,Open,1,Spearman
+d30p5purse,Windows,7,Place,,,327,Enemy,Palm,0,Peasant
+d30p5purse,Windows,8,Place,,,168,Enemy,Open,1,Spearman
+d30p5purse,Windows,9,Place,,,151,Enemy,Capital,1,Spearman
+d30p5purse,Windows,10,Place,,,133,Enemy,Open,0,Peasant
+d30p5purse,Windows,11,Place,,,305,Enemy,Open,1,Knight
+d30p5purse,Windows,12,Place,,,357,Enemy,Knight,3,Baron
+d30p5purse,Windows,13,Place,,,322,Enemy,Capital,1,Spearman
+d30p5purse,Windows,14,Place,,,238,Enemy,Capital,2,Knight
+d30p5purse,Conquest,1,Merge,150,Knight,167,Friendly,Peasant,,Baron
+d30p5purse,Conquest,2,Move,167,Baron,322,Enemy,Capital,3,Baron
+d30p5purse,Conquest,3,Merge,184,Peasant,219,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,4,Move,219,Spearman,287,Enemy,Capital,1,Spearman
+d30p5purse,Conquest,5,Merge,237,Peasant,254,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,6,Move,254,Spearman,344,Enemy,Capital,1,Spearman
+d30p5purse,Conquest,7,Build castle,430,,237,Friendly,Open,,Castle
+d30p5purse,Conquest,8,Build castle,430,,167,Friendly,Open,,Castle
+d30p5purse,Conquest,9,Recruit,430,Peasant,305,Enemy,Open,0,Peasant
+d30p5purse,Conquest,10,Recruit,430,Peasant,304,Enemy,Open,0,Peasant
+d30p5purse,Conquest,11,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Conquest,12,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,13,Move,150,Spearman,327,Enemy,Capital,1,Spearman
+d30p5purse,Conquest,14,Recruit,430,Peasant,362,Enemy,Open,0,Peasant
+d30p5purse,Conquest,15,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Conquest,16,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,17,Move,150,Spearman,168,Enemy,Open,1,Spearman
+d30p5purse,Conquest,18,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Conquest,19,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,20,Move,150,Spearman,151,Enemy,Capital,1,Spearman
+d30p5purse,Conquest,21,Recruit,430,Peasant,133,Enemy,Open,0,Peasant
+d30p5purse,Conquest,22,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Conquest,23,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,24,Buy upgrade,430,Peasant,150,Friendly,Spearman,,Knight
+d30p5purse,Conquest,25,Move,150,Knight,238,Enemy,Capital,2,Knight
+d30p5purse,Conquest,26,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Conquest,27,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,28,Move,150,Spearman,185,Enemy,Capital,1,Spearman
+d30p5purse,Conquest,29,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Conquest,30,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,31,Move,150,Spearman,203,Enemy,Capital,1,Spearman
+d30p5purse,Conquest,32,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5purse,Conquest,33,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5purse,Conquest,34,Move,150,Spearman,202,Enemy,Capital,1,Spearman
+d30p5purse,Conquest,35,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5spearpair,Windows,1,Place,,,220,Enemy,Peasant,1,Spearman
+d30p5spearpair,Windows,2,Place,,,344,Enemy,Capital,1,Spearman
+d30p5spearpair,Windows,3,Place,,,202,Enemy,Open,0,Peasant
+d30p5spearpair,Windows,4,Place,,,185,Enemy,Open,0,Peasant
+d30p5spearpair,Windows,5,Place,,,203,Enemy,Open,0,Peasant
+d30p5spearpair,Windows,6,Place,,,305,Enemy,Open,1,Knight
+d30p5spearpair,Windows,7,Place,,,357,Enemy,Knight,3,Baron
+d30p5spearpair,Conquest,1,Merge,150,Spearman,167,Friendly,Spearman,,Baron
+d30p5spearpair,Conquest,2,Move,167,Baron,322,Enemy,Capital,3,Baron
+d30p5spearpair,Conquest,3,Merge,184,Peasant,219,Friendly,Peasant,,Spearman
+d30p5spearpair,Conquest,4,Move,219,Spearman,287,Enemy,Capital,1,Spearman
+d30p5spearpair,Conquest,5,Merge,237,Peasant,254,Friendly,Peasant,,Spearman
+d30p5spearpair,Conquest,6,Move,254,Spearman,344,Enemy,Capital,1,Spearman
+d30p5spearpair,Conquest,7,Build castle,430,,237,Friendly,Open,,Castle
+d30p5spearpair,Conquest,8,Build castle,430,,167,Friendly,Open,,Castle
+d30p5spearpair,Conquest,9,Recruit,430,Peasant,305,Enemy,Open,0,Peasant
+d30p5spearpair,Conquest,10,Recruit,430,Peasant,304,Enemy,Open,0,Peasant
+d30p5spearpair,Conquest,11,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d30p5spearpair,Conquest,12,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d30p5spearpair,Conquest,13,Move,150,Spearman,327,Enemy,Capital,1,Spearman
+d30p5spearpair,Conquest,14,Recruit,430,Peasant,362,Enemy,Open,0,Peasant
+d30p5spearpair,Conquest,15,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Windows,1,Place,,,185,Enemy,Castle,2,Knight
+d31p5purse,Windows,2,Place,,,202,Enemy,Open,0,Peasant
+d31p5purse,Windows,3,Place,,,220,Enemy,Open,0,Peasant
+d31p5purse,Windows,4,Place,,,203,Enemy,Open,0,Peasant
+d31p5purse,Windows,5,Place,,,168,Enemy,Open,1,Spearman
+d31p5purse,Windows,6,Place,,,305,Enemy,Knight,3,Baron
+d31p5purse,Windows,7,Place,,,322,Enemy,Capital,1,Spearman
+d31p5purse,Windows,8,Place,,,238,Enemy,Capital,2,Knight
+d31p5purse,Windows,9,Place,,,221,Enemy,Open,1,Spearman
+d31p5purse,Windows,10,Place,,,133,Enemy,Open,1,Spearman
+d31p5purse,Windows,11,Place,,,151,Enemy,Palm,0,Peasant
+d31p5purse,Windows,12,Place,,,344,Enemy,Capital,1,Spearman
+d31p5purse,Windows,13,Place,,,327,Enemy,Open,0,Peasant
+d31p5purse,Conquest,1,Move,150,Knight,344,Enemy,Capital,1,Knight
+d31p5purse,Conquest,2,Merge,167,Peasant,237,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,3,Merge,237,Spearman,254,Friendly,Peasant,,Knight
+d31p5purse,Conquest,4,Merge,254,Knight,255,Friendly,Peasant,,Baron
+d31p5purse,Conquest,5,Move,255,Baron,322,Enemy,Capital,3,Baron
+d31p5purse,Conquest,6,Move,272,Peasant,327,Enemy,Open,0,Peasant
+d31p5purse,Conquest,7,Build castle,430,,237,Friendly,Open,,Castle
+d31p5purse,Conquest,8,Build castle,430,,167,Friendly,Open,,Castle
+d31p5purse,Conquest,9,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Conquest,10,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,11,Buy upgrade,430,Peasant,150,Friendly,Spearman,,Knight
+d31p5purse,Conquest,12,Move,150,Knight,168,Enemy,Open,2,Knight
+d31p5purse,Conquest,13,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Conquest,14,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,15,Move,150,Spearman,151,Enemy,Capital,1,Spearman
+d31p5purse,Conquest,16,Recruit,430,Peasant,133,Enemy,Open,0,Peasant
+d31p5purse,Conquest,17,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Conquest,18,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,19,Buy upgrade,430,Peasant,150,Friendly,Spearman,,Knight
+d31p5purse,Conquest,20,Move,150,Knight,238,Enemy,Capital,2,Knight
+d31p5purse,Conquest,21,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Conquest,22,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,23,Move,150,Spearman,221,Enemy,Open,1,Spearman
+d31p5purse,Conquest,24,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Conquest,25,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,26,Move,150,Spearman,304,Enemy,Open,1,Spearman
+d31p5purse,Conquest,27,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Conquest,28,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,29,Move,150,Spearman,356,Enemy,Open,1,Spearman
+d31p5purse,Conquest,30,Recruit,430,Peasant,150,Friendly,Open,,Peasant
+d31p5purse,Conquest,31,Buy upgrade,430,Peasant,150,Friendly,Peasant,,Spearman
+d31p5purse,Conquest,32,Move,150,Spearman,373,Enemy,Capital,1,Spearman
