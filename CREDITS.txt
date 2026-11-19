@@ -1,0 +1,10 @@
+Conquest
+
+Game design inspired by Slay by Sean O'Connor.
+Original island and illustrations created for this project.
+
+Built with Godot Engine, distributed under the MIT license.
+Godot Engine and third-party notices: https://godotengine.org/license/
+
+Crimson Text is distributed under the SIL Open Font License.
+The accompanying OFL.txt contains the font authorship and license.
