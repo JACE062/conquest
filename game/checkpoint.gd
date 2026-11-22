@@ -6,7 +6,15 @@ const KEY = "conquest.end-turn.v1"
 static func write(data: Dictionary) -> bool:
 	var bytes = var_to_bytes(data).compress(FileAccess.COMPRESSION_GZIP)
 	var encoded = Marshalls.raw_to_base64(bytes)
-	return JavaScriptBridge.eval("try { localStorage.setItem('%s','%s'); true } catch (_) { false }" % [KEY,encoded]) == true
+	# Use a string acknowledgement across the web bridge and verify the write.
+	var script = """(() => {
+		try {
+			const key = '%s', value = '%s';
+			localStorage.setItem(key, value);
+			return localStorage.getItem(key) === value ? 'saved' : '';
+		} catch (_) { return ''; }
+	})()"""
+	return JavaScriptBridge.eval(script % [KEY,encoded]) == "saved"
 
 static func read() -> Dictionary:
 	if not OS.has_feature("web"):
