@@ -70,7 +70,7 @@ func update_chart():
 		if seat < counts.size():
 			var house = houses[seat]
 			totals[seat].text = "%s%s  %d" % [Island.HOUSES[house], " (you)" if seat == human else "", counts[seat]]
-			totals[seat].add_theme_color_override("font_color", Color(Island.COLORS[house]).lightened(0.18))
+			totals[seat].add_theme_color_override("font_color", Color(Island.COLORS[house]).darkened(0.50))
 	plot.queue_redraw()
 
 func draw_chart():
@@ -85,27 +85,28 @@ func draw_chart():
 	var step = maxi(1, ceili(peak / 4.0))
 	var area = Rect2(Vector2(42, 14), plot.size - Vector2(56, 46))
 	var font = plot.get_theme_default_font()
-	var ink = Color("#d2d9d6")
+	var ink = Color("#223836")
 	for i in 5:
 		var y = area.end.y - area.size.y * i / 4.0
-		plot.draw_line(Vector2(area.position.x,y), Vector2(area.end.x,y), Color("#5a6667"))
+		plot.draw_line(Vector2(area.position.x,y), Vector2(area.end.x,y), Color("#c8c5b2"))
 		plot.draw_string(font, Vector2(0,y + 5), str(i * step), HORIZONTAL_ALIGNMENT_RIGHT, 34, 14, ink)
 	plot.draw_string(font, Vector2(area.position.x,area.end.y + 23), "Opening", HORIZONTAL_ALIGNMENT_LEFT, -1, 14, ink)
 	plot.draw_string(font, Vector2(area.position.x,area.end.y + 23), "Round %d" % completed.size(), HORIZONTAL_ALIGNMENT_RIGHT, area.size.x, 14, ink)
 	if completed.size() >= 4:
 		var middle = floori(completed.size() * 0.5)
 		var x = area.position.x + area.size.x * middle / completed.size()
-		plot.draw_line(Vector2(x,area.position.y), Vector2(x,area.end.y), Color("#5a6667"))
+		plot.draw_line(Vector2(x,area.position.y), Vector2(x,area.end.y), Color("#c8c5b2"))
 		plot.draw_string(font, Vector2(x - 35,area.end.y + 23), str(middle), HORIZONTAL_ALIGNMENT_CENTER, 70, 14, ink)
 	var seats = range(current[measure].size())
-	seats.erase(human)
-	seats.append(human)
+	if human >= 0:
+		seats.erase(human)
+		seats.append(human)
 	for seat in seats:
 		var points = PackedVector2Array()
 		for i in series.size():
 			var value = series[i][measure][seat]
 			points.append(Vector2(area.position.x + area.size.x * i / (series.size() - 1),
 				area.end.y - area.size.y * value / (4 * step)))
-		var color = Color(Island.COLORS[houses[seat]])
+		var color = Color(Island.COLORS[houses[seat]]).darkened(0.25)
 		plot.draw_polyline(points, color, 3.5 if seat == human else 2.0, true)
 		plot.draw_circle(points[-1], 4 if seat == human else 3, color)

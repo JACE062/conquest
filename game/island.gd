@@ -2,6 +2,19 @@ extends RefCounted
 
 enum Size { SMALL, MEDIUM, LARGE, EXTRA_LARGE }
 const SIZE_NAMES = ["Small", "Medium", "Large", "Extra Large"]
+const DUEL_ISLAND = "Foxridge"
+const HEAD_TO_HEAD = "Twin Shoals"
+const NEUTRAL = -1
+const NEUTRAL_COLOR = Color("#c5c1a8")
+const SHOALS_ROWS = [
+	"...nnnnn...",
+	".nnnnnnnn..",
+	"n00nnnnnnnn",
+	"n00nnnn11n.",
+	"nnnnnnnn11n",
+	".nnnnnnnn..",
+	"...nnnnn...",
+]
 const TITLE = "Kestrel Strait"
 const HOUSES = ["Ochre", "Rose", "Sage", "Azure", "Heather", "Amber"]
 const COLORS = ["#dbb75c", "#c98278", "#8dac83", "#80a7b7", "#a793b2", "#d69a64"]
@@ -287,6 +300,18 @@ static func islands_of_size(island_size: Size) -> Array:
 			names.append(island)
 	return names
 
+static func duel_rows(cooperative = false) -> Array:
+	# Territories on Foxridge in ascending connected-land order (7, 8, 8, 8, 9, 10).
+	# Original houses 1 and 5 share four edges between village territories.
+	var opening_order = [1,5,2,4,3,0] if cooperative else [1,2,4,5,3,0]
+	var rows = []
+	for original in MAPS[DUEL_ISLAND][0]:
+		var row = ""
+		for symbol in original:
+			row += "." if symbol == "." else str(opening_order.find(int(symbol)))
+		rows.append(row)
+	return rows
+
 static func house_colors_for_match(player_color: int, previous: Array) -> Array:
 	var colors = range(HOUSES.size())
 	colors.erase(player_color)
@@ -305,5 +330,5 @@ static func tiles(rows: Array = ROWS) -> Dictionary:
 		for col in rows[row].length():
 			var symbol = rows[row][col]
 			if symbol != ".":
-				cells[axial(col, row)] = {"owner": int(symbol), "piece": 0, "cash": 0, "spent": false}
+				cells[axial(col, row)] = {"owner": NEUTRAL if symbol == "n" else int(symbol), "piece": 0, "cash": 0, "spent": false}
 	return cells

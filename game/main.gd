@@ -17,6 +17,7 @@ var game
 var board = Board.new()
 var selected = R.NONE
 var source = R.NONE
+var inspected_defender = R.NONE
 var mode = ""
 var history = []
 var round_label: Label
@@ -24,6 +25,25 @@ var difficulty_selector = OptionButton.new()
 var color_selector = OptionButton.new()
 var size_selector = OptionButton.new()
 var island_selector = OptionButton.new()
+var duel = false
+var cooperative = false
+var swapped = false
+var reverse_button: Button
+var reverse_requested = false
+var solo_color = 0
+var solo_tier = AI.Difficulty.STANDARD
+var duel_button: Button
+var duel_dialog = ConfirmationDialog.new()
+var duel_description: Label
+var duel_format = OptionButton.new()
+var duel_colors = [OptionButton.new(),OptionButton.new()]
+var duel_color_rows: VBoxContainer
+var duel_options = AcceptDialog.new()
+var resignation = ConfirmationDialog.new()
+var concession = ConfirmationDialog.new()
+var resign_button: Button
+var concede_button: Button
+var handoff = AcceptDialog.new()
 var active_island = Island.TITLE
 var requested_island = Island.TITLE
 var turn_label: Label
@@ -52,6 +72,7 @@ var restart_dialog = ConfirmationDialog.new()
 var end_turn_dialog = preload("res://game/end_turn_dialog.gd").new()
 var surrender_dialog = ConfirmationDialog.new()
 var result_dialog = AcceptDialog.new()
+var modals: Array = []
 var territory_graph = preload("res://game/territory_graph.gd").new()
 var finished = false
 var surrender_pending = false
@@ -215,6 +236,7 @@ func build_ui():
 	island_selector.add_theme_font_size_override("font_size",28)
 	map_header.add_child(island_selector)
 	island_selector.item_selected.connect(choose_island)
+	duel_button = button(map_header,"Local multiplayer",offer_duel,NIGHT,LIGHT,MUTED)
 	spacer(map_header)
 	tile_info = label(map_header,"",14,Color("#c0d1c5"))
 	map.add_child(board)
@@ -352,8 +374,7 @@ func draw_overview():
 	var transform = overview_transform()
 	for p in game.cells:
 		var at = transform * board.axial_center(p)
-		var house = board.house_ids[game.cells[p].owner]
-		overview.draw_colored_polygon(Board.corners(at,transform.x.length()),Color(Island.COLORS[house]))
+		overview.draw_colored_polygon(Board.corners(at,transform.x.length()),board.land_color(game.cells[p].owner))
 	if game.lands.has(selected):
 		var at = transform * board.axial_center(selected)
 		overview.draw_arc(at,4,0,TAU,16,INK,3,true)
@@ -362,8 +383,39 @@ func draw_overview():
 	overview.draw_rect(frame,NIGHT,false,3)
 	overview.draw_rect(frame,LIGHT,false,1)
 
+func menu_theme() -> Theme:
+	var theme = Theme.new()
+	var frame = surface(NIGHT,NIGHT)
+	frame.expand_margin_top = 36
+	theme.set_constant("title_height","Window",36)
+	theme.set_constant("close_v_offset","Window",26)
+	theme.set_constant("close_h_offset","Window",28)
+	for state in ["embedded_border","embedded_unfocused_border"]:
+		theme.set_stylebox(state,"Window",frame)
+	theme.set_font("title_font","Window",SERIF)
+	theme.set_font_size("title_font_size","Window",22)
+	theme.set_color("title_color","Window",LIGHT)
+	var paper = surface(PAPER,PAPER,2)
+	paper.content_margin_left = 16
+	paper.content_margin_right = 16
+	paper.content_margin_top = 12
+	paper.content_margin_bottom = 12
+	theme.set_stylebox("panel","AcceptDialog",paper)
+	theme.set_constant("buttons_separation","AcceptDialog",8)
+	theme.set_color("font_color","Label",INK)
+	return theme
+
+func style_dialog_selector(picker: OptionButton):
+	style_button(picker,Color("#e4dece"),INK,Color("#aaa796"))
+	picker.add_theme_color_override("font_focus_color",INK)
+	picker.add_theme_color_override("font_hover_pressed_color",INK)
+	picker.add_theme_constant_override("modulate_arrow",1)
+
 func configure_dialogs():
+	var menus = menu_theme()
 	add_child(territory_graph)
+	territory_graph.theme = menus
+	style_dialog_selector(territory_graph.metric)
 	territory_graph.confirmed.connect(return_from_graph)
 	territory_graph.canceled.connect(return_from_graph)
 	var shade = ColorRect.new()
@@ -373,12 +425,18 @@ func configure_dialogs():
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(help_dialog)
 	add_child(end_turn_dialog)
-	for guide in [help_dialog,end_turn_dialog]:
-		guide.visibility_changed.connect(func(): shade.visible = help_dialog.visible or end_turn_dialog.visible)
-	for dialog in [restart_dialog,surrender_dialog,result_dialog]:
+	var dialogs = [restart_dialog,surrender_dialog,result_dialog,duel_dialog,duel_options,resignation,concession,handoff]
+	for dialog in dialogs:
 		add_child(dialog)
+		dialog.theme = menus
 		dialog.exclusive = true
 		dialog.dialog_autowrap = true
+	modals = dialogs + [territory_graph,help_dialog,end_turn_dialog]
+	for dialog in modals:
+		# Godot drops the main window's close request while it has an exclusive child.
+		if OS.has_feature("windows"):
+			dialog.exclusive = false
+		dialog.visibility_changed.connect(func(): shade.visible = modals.any(func(w): return is_instance_valid(w) and w.visible))
 	restart_dialog.confirmed.connect(confirm_new_match)
 	end_turn_dialog.confirmed.connect(end_human_turn)
 	end_turn_dialog.village_requested.connect(show_reminder_village)
@@ -389,19 +447,216 @@ func configure_dialogs():
 	surrender_dialog.confirmed.connect(resolve_surrender.bind(true))
 	surrender_dialog.canceled.connect(resolve_surrender.bind(false))
 	result_dialog.ok_button_text = "Play again"
-	result_dialog.add_button("Territory history",true,"territory")
+	style_button(result_dialog.add_button("Territory history",true,"territory"),PAPER,INK,MUTED)
 	result_dialog.custom_action.connect(func(_action): show_territory())
-	result_dialog.confirmed.connect(start)
+	result_dialog.confirmed.connect(func():
+		if active_island == Island.HEAD_TO_HEAD: offer_duel()
+		elif duel: swap_rematch()
+		else: start())
+	duel_dialog.confirmed.connect(func():
+		if duel and reverse_requested: start({},1 - game.first_seat)
+		elif duel: swap_rematch()
+		else: enter_duel())
+	duel_dialog.wrap_controls = false
+	var setup_scroll = ScrollContainer.new()
+	setup_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	setup_scroll.follow_focus = true
+	duel_dialog.add_child(setup_scroll)
+	var setup_body = column(setup_scroll,8)
+	setup_body.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	duel_format.add_item("Foxridge · Four bots")
+	duel_format.add_item("Twin Shoals · Head-to-head")
+	duel_format.add_item("Foxridge · Co-op")
+	duel_format.accessibility_name = "Match format"
+	style_dialog_selector(duel_format)
+	setup_body.add_child(duel_format)
+	duel_format.item_selected.connect(describe_format)
+	duel_description = Label.new()
+	duel_description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	setup_body.add_child(duel_description)
+	duel_color_rows = column(setup_body,6)
+	for player in 2:
+		var line = row(duel_color_rows,10)
+		var caption = "Player %d color" % (player + 1)
+		label(line,caption,16,INK)
+		var picker = duel_colors[player]
+		picker.accessibility_name = caption
+		for i in color_selector.item_count:
+			picker.add_icon_item(color_selector.get_item_icon(i),Island.HOUSES[i],i)
+		picker.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		style_dialog_selector(picker)
+		line.add_child(picker)
+		picker.item_selected.connect(update_duel_choices)
+	duel_options.title = "Duel options"
+	duel_options.ok_button_text = "Back"
+	var actions = VBoxContainer.new()
+	duel_options.add_child(actions)
+	resign_button = button(actions,"Resign duel",offer_concession.bind(false),NIGHT,LIGHT,MUTED)
+	concede_button = button(actions,"Propose conceding to bots",offer_concession.bind(true),NIGHT,LIGHT,MUTED)
+	button(actions,"Swap and rematch",confirm_duel,NIGHT,LIGHT,MUTED)
+	reverse_button = button(actions,"Reverse turn order",confirm_duel.bind(true),NIGHT,LIGHT,MUTED)
+	button(actions,"Singleplayer",func():
+		duel_options.hide()
+		duel = false
+		cooperative = false
+		if active_island == Island.HEAD_TO_HEAD:
+			active_island = Island.DUEL_ISLAND
+		swapped = false
+		color_selector.select(solo_color)
+		difficulty_selector.select(difficulty_selector.get_item_index(solo_tier))
+		start(),NIGHT,LIGHT,MUTED)
+	resignation.cancel_button_text = "Keep playing"
+	concession.cancel_button_text = "Keep playing"
+	resignation.confirmed.connect(finish_concession.bind(false))
+	concession.confirmed.connect(finish_concession.bind(true))
+	handoff.ok_button_text = "Begin turn"
+	for dialog in [territory_graph,restart_dialog,surrender_dialog,result_dialog,duel_dialog,duel_options,resignation,concession,handoff]:
+		style_button(dialog.get_ok_button(),GOLD,INK,MUTED)
+		dialog.get_ok_button().add_theme_color_override("font_focus_color",INK)
+		if dialog is ConfirmationDialog:
+			style_button(dialog.get_cancel_button(),PAPER,INK,MUTED)
+			dialog.get_cancel_button().add_theme_color_override("font_focus_color",INK)
 
-func start(saved: Dictionary = {}):
+func human_turn() -> bool:
+	return game.active == 0 or (duel and game.active == 1)
+
+func player_number(seat: int) -> int:
+	return 2 - seat if swapped else seat + 1
+
+func offer_duel():
+	if duel:
+		resign_button.disabled = finished or not human_turn()
+		concede_button.disabled = resign_button.disabled
+		show_dialog(duel_options,Vector2i(340,246))
+	else:
+		confirm_duel()
+
+func offer_concession(together: bool):
+	if not duel or finished or not human_turn() or (cooperative and not together):
+		return
+	duel_options.hide()
+	var other = 1 - game.active
+	var dialog = concession if together else resignation
+	if together:
+		dialog.title = "Pass to Player %d" % player_number(other)
+		dialog.dialog_text = "%s proposes conceding to the computer houses. Player %d (%s), do you agree to end the match together?" % [house_name(game.active),player_number(other),house_name(other)]
+		dialog.ok_button_text = "Agree and end match"
+	else:
+		dialog.title = "Resign duel?"
+		dialog.dialog_text = "Resigning gives Player %d (%s) the duel win and ends this match." % [player_number(other),house_name(other)]
+		dialog.ok_button_text = "Resign duel"
+	show_dialog(dialog,Vector2i(420,180))
+	dialog.get_cancel_button().grab_focus()
+
+func finish_concession(together: bool):
+	if not duel or finished or not human_turn() or (cooperative and not together):
+		return
+	var other = 1 - game.active
+	finished = true
+	Checkpoint.clear()
+	result_dialog.title = "Joint concession" if together else "Player %d wins" % player_number(other)
+	result_dialog.dialog_text = ("%s and %s conceded to the computer houses" if together else "%s conceded to %s") % [house_name(game.active),house_name(other)] + " · Round %d" % game.round_number
+	status.text = result_dialog.dialog_text
+	refresh()
+	show_dialog(result_dialog,Vector2i(410,160))
+
+func confirm_duel(reverse = false):
+	reverse_requested = reverse
+	duel_options.hide()
+	duel_dialog.title = "Local multiplayer"
+	duel_format.visible = not duel
+	duel_color_rows.visible = not duel
+	duel_dialog.ok_button_text = "Start duel"
+	if duel:
+		duel_description.text = "Start %s again with the players’ positions and turn order exchanged?" % active_island
+		duel_dialog.ok_button_text = "Swap and rematch"
+		if reverse:
+			var next_first = 1 - game.first_seat
+			duel_description.text = "Keep your colors and villages. Player %d (%s) will move first in the rematch." % [player_number(next_first),house_name(next_first)]
+			duel_dialog.ok_button_text = "Reverse and rematch"
+	else:
+		describe_format(duel_format.selected)
+		var first = color_selector.get_selected_id()
+		duel_colors[0].select(first)
+		duel_colors[1].select(0 if first == 1 else 1)
+		update_duel_choices()
+	var setup_height = 360 if get_viewport_rect().size.x < 420 else 310
+	show_dialog(duel_dialog,Vector2i(460,155 if duel else setup_height))
+
+func describe_format(index: int):
+	if index == 2:
+		duel_description.text = "Team up against four Standard bots. Move through allied land and pay your own troops. Starting replaces this match."
+		duel_dialog.ok_button_text = "Start co-op"
+		return
+	duel_dialog.ok_button_text = "Start duel"
+	duel_description.text = ("Two players, one village each. Expand across neutral land and eliminate the other village territory." if index == 1 else "Choose your colors and share the device against four Standard bots.") + " Starting replaces this match."
+
+func update_duel_choices(_index = -1):
+	for player in 2:
+		for i in Island.HOUSES.size():
+			duel_colors[player].set_item_disabled(i,i == duel_colors[1-player].get_selected_id())
+
+func enter_duel():
+	solo_color = color_selector.get_selected_id()
+	solo_tier = difficulty_selector.get_selected_id()
+	duel = true
+	cooperative = duel_format.selected == 2
+	active_island = Island.HEAD_TO_HEAD if duel_format.selected == 1 else Island.DUEL_ISLAND
+	swapped = false
+	board.house_ids = range(Island.HOUSES.size())
+	for seat in 2:
+		var house = duel_colors[seat].get_selected_id()
+		var other = board.house_ids.find(house)
+		board.house_ids[other] = board.house_ids[seat]
+		board.house_ids[seat] = house
+	start({},0)
+
+func swap_rematch():
+	swapped = not swapped
+	var first = board.house_ids[0]
+	board.house_ids[0] = board.house_ids[1]
+	board.house_ids[1] = first
+	start()
+
+func announce_turn():
+	handoff.title = "Player %d · House %s" % [player_number(game.active),house_name(game.active)]
+	handoff.dialog_text = "Pass the device to Player %d for round %d." % [player_number(game.active),game.round_number]
+	show_dialog(handoff,Vector2i(380,150))
+
+func start(saved: Dictionary = {}, opening_seat = -1):
 	if game:
 		Checkpoint.clear()
 	if not saved.is_empty():
 		active_island = saved.island
+		duel = saved.get("duel",false)
+		cooperative = duel and saved.get("cooperative",false)
+		swapped = saved.get("swapped",false)
+		solo_color = saved.get("solo_color",0)
+		solo_tier = saved.get("solo_tier",AI.Difficulty.STANDARD)
+	if duel:
+		difficulty_selector.select(difficulty_selector.get_item_index(AI.Difficulty.STANDARD))
+	duel_options.title = "Co-op options" if cooperative else "Duel options"
+	duel_button.text = duel_options.title if duel else "Local multiplayer"
+	resign_button.visible = not cooperative
+	result_dialog.ok_button_text = "Swap and rematch" if duel else "Play again"
 	portrait.set_menu(false)
-	var layout = Island.MAPS[active_island]
-	board.house_ids = Island.house_colors_for_match(color_selector.get_selected_id(), board.house_ids)
-	game = R.new_game(layout[0], layout[1])
+	var direct = active_island == Island.HEAD_TO_HEAD
+	reverse_button.visible = direct
+	if direct:
+		result_dialog.ok_button_text = "Rematch options"
+	concede_button.visible = not direct
+	difficulty_selector.get_parent().visible = not direct
+	if direct:
+		if opening_seat == -1:
+			opening_seat = saved.get("first_seat",0) if not saved.is_empty() else (game.first_seat if game else 0)
+		game = R.new_game(Island.SHOALS_ROWS,[],2,opening_seat)
+	elif duel:
+		game = R.new_game(Island.duel_rows(cooperative),Island.MAPS[active_island][1])
+		game.cooperative = cooperative
+	else:
+		var layout = Island.MAPS[active_island]
+		board.house_ids = Island.house_colors_for_match(color_selector.get_selected_id(), board.house_ids)
+		game = R.new_game(layout[0], layout[1])
 	territory_graph.reset(game)
 	show_active_island()
 	surrender_dialog.dialog_text = "Accept their surrender and take control of %s?" % active_island
@@ -417,6 +672,7 @@ func start(saved: Dictionary = {}):
 	board.grab_focus()
 	status.text = "Tap Recruit to place a peasant." if portrait.active else "Select Recruit peasant, then choose a marked hex."
 	if not saved.is_empty():
+		game.active = saved.get("active",0)
 		game.restore(saved.cells)
 		game.round_number = saved.round
 		game.surrender_wait = saved.wait
@@ -438,6 +694,8 @@ func start(saved: Dictionary = {}):
 		board.look_at_world(saved.center)
 	elif portrait.active:
 		portrait.frame_opening(self)
+	if duel:
+		announce_turn()
 
 func select_largest():
 	selected = R.NONE
@@ -449,16 +707,24 @@ func select_largest():
 	clear_order()
 
 func clear_order():
+	inspected_defender = R.NONE
 	mode = ""
 	source = R.NONE
 
 func refresh():
-	var player = game.active == 0 and not finished and not surrender_pending
+	board.local_seat = 0
+	if duel:
+		board.local_seat = game.active if human_turn() else -1
+	var player = human_turn() and not finished and not surrender_pending
 	round_label.text = "Round %02d" % game.round_number
 	turn_label.text = "MATCH COMPLETE" if finished else ("YOUR TURN" if player else "COMPUTER TURN")
+	if duel and player:
+		turn_label.text = "PLAYER %d TURN" % player_number(game.active)
+	if duel:
+		color_selector.select(board.house_ids[game.active])
 	if surrender_pending:
 		turn_label.text = "SURRENDER OFFER"
-	elif not finished and game.active != 0 and not game.can_take_turn(0):
+	elif not duel and not finished and game.active != 0 and not game.can_take_turn(0):
 		turn_label.text = "SPECTATING"
 	house_label.text = "House " + house_name(game.active)
 	portrait.compact_turn.text = "%s · %d" % [turn_label.text,game.round_number]
@@ -484,10 +750,10 @@ func refresh():
 	undo_button.visible = not finished
 	history_button.visible = finished
 	end_button.disabled = not player
-	difficulty_selector.disabled = not player
-	color_selector.disabled = finished or surrender_pending
-	island_selector.disabled = surrender_pending
-	size_selector.disabled = surrender_pending
+	difficulty_selector.disabled = duel or not player
+	color_selector.disabled = duel or finished or surrender_pending
+	island_selector.disabled = duel or surrender_pending
+	size_selector.disabled = duel or surrender_pending
 	var connected = game.connected_land_counts()
 	connected.resize(legend_labels.size())
 	var largest = 1
@@ -495,27 +761,57 @@ func refresh():
 		largest = maxi(largest,count)
 	for seat in legend_labels.size():
 		var house = board.house_ids[seat]
-		legend_labels[house].text = Island.HOUSES[house] + (" (you)" if seat == 0 else "")
+		for item in [legend_labels[house],land_bars[house],land_values[house]]:
+			item.visible = seat < game.players
+		var suffix = " (you)" if seat == 0 else ""
+		if duel:
+			suffix = " (P%d)" % player_number(seat) if seat < 2 else ""
+		legend_labels[house].text = Island.HOUSES[house] + suffix
 		legend_labels[house].modulate.a = 1.0 if game.can_take_turn(seat) else 0.45
 		land_bars[house].max_value = largest
 		land_bars[house].value = connected[seat]
 		land_values[house].text = str(connected[seat])
 	overview.queue_redraw()
-	board.mark(cap,source,game.targets(mode,source) if mode != "" else [])
+	var defender = source if source != R.NONE else inspected_defender
+	board.mark(cap,source,game.targets(mode,source) if mode != "" else [],defender if player else R.NONE)
 	inspect(board.inspected_hex())
+
+func supply_warning(p: Vector2i) -> String:
+	var house = house_name(game.commander(p))
+	if game.home_village(p) == R.NONE:
+		return "Home village lost. This unit will starve on %s’s payday." % house
+	return "Cut off from %s. Reconnect before %s’s payday." % [board.home_badges[p],house]
 
 func inspect(p):
 	if not game or not game.cells.has(p):
 		tile_info.text = ""
 	else:
 		var cell = game.cells[p]
+		if board.cut_off_units.has(p):
+			tile_info.text = supply_warning(p)
+			return
+		if board.capture_owners.has(p):
+			tile_info.text = "Capture for House %s · Defense %d" % [house_name(board.capture_owners[p]),game.defense(p)]
+			return
+		if cell.owner == Island.NEUTRAL:
+			tile_info.text = "Neutral land · Undefended"
+			return
 		var land = "Isolated hex" if game.capitals[p] == R.NONE and cell.piece == R.EMPTY else R.PIECES[cell.piece]
-		if cell.piece == R.CAPITAL and cell.owner == 0:
+		if cell.has("commander"):
+			land = "%s %s" % [house_name(cell.commander),land]
+		elif game.allied(board.local_seat,cell.owner):
+			land = "Ally · " + land
+		if cell.piece == R.CAPITAL and cell.owner == board.local_seat:
 			land = "Your capital"
 		tile_info.text = "%s  ·  %s  ·  Defense %d" % [house_name(cell.owner),land,game.defense(p)]
+		if board.home_badges.has(p):
+			var tag = board.home_badges[p]
+			tile_info.text += "  ·  Home village lost" if tag == "×" else "  ·  Home %s" % tag
+		if p in board.defended_allied_tiles:
+			tile_info.text += "  ·  Defended by selection"
 
 func pick(p):
-	if game.active != 0 or finished or surrender_pending:
+	if not human_turn() or finished or surrender_pending:
 		return
 	if p == R.NONE or (mode == "move" and p == source):
 		clear_order()
@@ -524,24 +820,33 @@ func pick(p):
 		history.append([game.cells.duplicate(true),selected])
 		var previous = mode
 		game.apply(mode,source,p)
-		selected = game.capitals[p]
+		selected = game.home_village(p)
 		clear_order()
 		status.text = "Castle built." if previous == "build" else "Order complete. Select a ready unit or end your turn."
 		check_result()
-	elif game.cells[p].owner == 0 and game.capitals[p] != R.NONE:
-		selected = game.capitals[p]
+	elif game.commander(p) == game.active and game.home_village(p) != R.NONE:
+		selected = game.home_village(p)
 		clear_order()
+		inspected_defender = p if R.guard(game.cells[p].piece) > 0 else selected
 		if R.is_unit(game.cells[p].piece) and not game.cells[p].spent:
 			mode = "move"
 			source = p
 			status.text = "Choose a marked destination for your " + R.PIECES[game.cells[p].piece].to_lower() + "."
+			if game.cooperative:
+				status.text = "Capture markers show the house that gains the hex."
 		else:
 			status.text = "Select a ready unit or purchase a piece for this territory."
 	elif mode != "":
 		status.text = "That hex is unavailable. Choose a marked hex or press Escape."
+	elif game.cells[p].owner == Island.NEUTRAL:
+		status.text = "Capture neutral land from a neighboring territory."
+	elif game.claimable_allied_hex(game.active,p):
+		status.text = "Move or recruit from a bordering village to claim this isolated allied hex."
 	elif game.capitals[p] == R.NONE:
 		status.text = "This isolated hex belongs to House %s. It has no village or treasury." % house_name(game.cells[p].owner)
 	refresh()
+	if board.cut_off_units.has(p):
+		status.text = supply_warning(p)
 
 func choose_purchase(kind, from_keyboard = false):
 	var control = recruit_button if kind == "recruit" else castle_button
@@ -558,7 +863,7 @@ func choose_purchase(kind, from_keyboard = false):
 	refresh()
 
 func undo():
-	if history.is_empty() or game.active != 0 or finished or surrender_pending:
+	if history.is_empty() or not human_turn() or finished or surrender_pending:
 		return
 	var entry = history.pop_back()
 	game.restore(entry[0])
@@ -573,15 +878,14 @@ func village_work() -> Dictionary:
 	var ready = 0
 	var villages: Array[Vector2i] = []
 	for cap in game.lands:
-		if game.cells[cap].owner != 0:
+		if game.cells[cap].owner != game.active:
 			continue
 		var affordable = game.cells[cap].cash >= R.RECRUIT_COST
 		if affordable:
 			funded += 1
 		var ready_before = ready
-		for hex in game.lands[cap]:
-			var cell = game.cells[hex]
-			if R.is_unit(cell.piece) and not cell.spent:
+		for hex in game.army(cap):
+			if not game.cells[hex].spent:
 				ready += 1
 		if affordable or ready > ready_before:
 			villages.append(cap)
@@ -591,19 +895,20 @@ func next_eligible(villages: Array) -> Vector2i:
 	return villages[(villages.find(selected) + 1) % villages.size()]
 
 func next_village():
-	if game.active != 0 or finished or surrender_pending:
+	if not human_turn() or finished or surrender_pending:
 		return
 	var villages = village_work().villages
 	if not villages.is_empty():
 		show_reminder_village(next_eligible(villages))
 
 func request_end_turn():
-	if game.active != 0 or finished or surrender_pending or end_turn_dialog.visible:
+	if not human_turn() or finished or surrender_pending or end_turn_dialog.visible:
 		return
 	var work = village_work()
 	var save_failed = false
 	if OS.has_feature("web"):
-		save_failed = not Checkpoint.write({"island":active_island,"houses":board.house_ids,
+		save_failed = not Checkpoint.write({"duel":duel,"cooperative":cooperative,"swapped":swapped,"first_seat":game.first_seat,"active":game.active,"solo_color":solo_color,"solo_tier":solo_tier,
+			"island":active_island,"houses":board.house_ids,
 			"difficulty":difficulty_selector.get_selected_id(),"cells":game.cells,"round":game.round_number,
 			"wait":game.surrender_wait,"graph":territory_graph.completed,"undo":Checkpoint.pack_history(history,game.cells),
 			"selected":selected,"source":source,"mode":mode,"cursor":board.cursor,"zoom":board.zoom,"center":board.view_center})
@@ -625,6 +930,7 @@ func request_end_turn():
 func show_reminder_village(cap: Vector2i):
 	clear_order()
 	selected = cap
+	inspected_defender = cap
 	board.cursor = cap
 	board.keyboard_cursor = true
 	board.zoom_at(maxf(1.0,25.0 / board.radius),board.size * 0.5)
@@ -635,10 +941,10 @@ func show_reminder_village(cap: Vector2i):
 	refresh()
 
 func end_human_turn():
-	if game.active != 0 or finished or surrender_pending:
+	if not human_turn() or finished or surrender_pending:
 		return
 	history.clear()
-	if game.offer_surrender_on_end_turn():
+	if not duel and game.offer_surrender_on_end_turn():
 		surrender_pending = true
 		clear_order()
 		refresh()
@@ -665,9 +971,18 @@ func next_player():
 	if game.round_number != previous_round:
 		territory_graph.finish_round(game)
 	select_largest()
-	if game.active == 0:
+	if cooperative:
+		check_result()
+		if finished:
+			refresh()
+			return
+	if human_turn():
+		if duel:
+			announce_turn()
 		if selected != R.NONE:
 			board.cursor = selected
+			if duel and board.zoom > 1.0:
+				board.look_at_world(board.axial_center(selected))
 		board.grab_focus()
 		if board.keyboard_cursor:
 			board.reveal_cursor()
@@ -679,18 +994,40 @@ func next_player():
 	refresh()
 
 func check_result():
-	if not finished and game.owns_island(game.active):
+	var duel_won = active_island == Island.HEAD_TO_HEAD and game.connected_land_counts()[1-game.active] == 0
+	if finished:
+		return
+	if cooperative:
+		var allies_left = game.can_take_turn(0) or game.can_take_turn(1)
+		var bots_left = false
+		for seat in range(2,game.players):
+			if game.can_take_turn(seat):
+				bots_left = true
+				break
+		if allies_left and bots_left:
+			return
 		finished = true
 		Checkpoint.clear()
-		result_dialog.title = "Island conquered" if game.active == 0 else "Defeat"
+		result_dialog.title = "Alliance victory" if allies_left else "Alliance defeated"
+		result_dialog.dialog_text = ("%s and %s defeated the four computer houses." if allies_left else "%s and %s have fallen on Foxridge.") % [house_name(0),house_name(1)]
+		status.text = result_dialog.dialog_text
+		show_dialog(result_dialog,Vector2i(410,160))
+	elif duel_won or game.owns_island(game.active):
+		finished = true
+		Checkpoint.clear()
+		result_dialog.title = "Island conquered" if human_turn() else "Defeat"
+		if duel:
+			result_dialog.title = "Player %d wins" % player_number(game.active) if human_turn() else "A computer wins"
 		result_dialog.dialog_text = "House %s controls %s." % [house_name(game.active),active_island]
+		if duel_won:
+			result_dialog.dialog_text = "House %s holds the last village on %s." % [house_name(game.active),active_island]
 		status.text = result_dialog.dialog_text
 		show_dialog(result_dialog,Vector2i(410,160))
 
 func _process(delta):
 	if portrait.active and portrait.menu.visible:
 		return
-	if not game or game.active == 0 or finished or surrender_pending or help_dialog.visible or territory_graph.visible or restart_dialog.visible or island_selector.get_popup().visible or size_selector.get_popup().visible or color_selector.get_popup().visible:
+	if not game or human_turn() or duel_dialog.visible or duel_options.visible or finished or surrender_pending or help_dialog.visible or territory_graph.visible or restart_dialog.visible or island_selector.get_popup().visible or size_selector.get_popup().visible or color_selector.get_popup().visible:
 		return
 	delay -= delta
 	if delay > 0:
@@ -709,13 +1046,13 @@ func house_name(seat: int) -> String:
 	return Island.HOUSES[board.house_ids[seat]]
 
 func set_computer_status():
-	status.text = "House %s is moving." % house_name(game.active) if game.can_take_turn(0) else "House %s has been eliminated. Watching House %s." % [house_name(0),house_name(game.active)]
+	status.text = "House %s is moving." % house_name(game.active) if duel or game.can_take_turn(0) else "House %s has been eliminated. Watching House %s." % [house_name(0),house_name(game.active)]
 
 func choose_color(house: int):
 	var other_seat = board.house_ids.find(house)
 	board.house_ids[other_seat] = board.house_ids[0]
 	board.house_ids[0] = house
-	if game.active == 0:
+	if human_turn():
 		status.text = "You are playing as House %s." % house_name(0)
 	else:
 		set_computer_status()
@@ -725,7 +1062,7 @@ func show_territory():
 	if not finished:
 		return
 	result_dialog.hide()
-	territory_graph.show_match(game, board.house_ids, 0)
+	territory_graph.show_match(game, board.house_ids, -1 if duel else 0)
 
 func return_from_graph():
 	if finished:
@@ -746,6 +1083,11 @@ func ask_restart():
 	show_dialog(restart_dialog,Vector2i(420,160))
 
 func show_active_island():
+	if active_island == Island.HEAD_TO_HEAD:
+		size_selector.select(Island.Size.SMALL)
+		island_selector.clear()
+		island_selector.add_item(active_island)
+		return
 	var island_size = Island.MAPS[active_island][2]
 	size_selector.select(island_size)
 	show_islands(island_size)
@@ -772,6 +1114,18 @@ func confirm_new_match():
 	active_island = requested_island
 	start()
 
+func _input(event):
+	# Embedded dialogs receive their own events first. Keep stray input that
+	# reaches the main viewport from activating the board or its shortcuts.
+	if OS.has_feature("windows"):
+		for dialog in modals:
+			if dialog.visible:
+				get_viewport().set_input_as_handled()
+				if event.is_pressed():
+					if not dialog.has_focus():
+						dialog.grab_focus()
+				return
+
 func _unhandled_key_input(event):
 	if surrender_pending or territory_graph.visible or not event.pressed or event.echo:
 		return
@@ -789,7 +1143,7 @@ func _unhandled_key_input(event):
 		KEY_N: request_end_turn()
 		KEY_F1: show_help()
 		KEY_ESCAPE:
-			if game.active == 0 and not finished:
+			if human_turn() and not finished:
 				clear_order()
 				status.text = "Order canceled."
 				refresh()

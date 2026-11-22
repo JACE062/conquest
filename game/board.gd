@@ -13,11 +13,16 @@ const SEA = Color("#1d4248")
 const INK = Color("#243d37")
 var game
 var house_ids = range(I.HOUSES.size())
+var local_seat = 0
 var selected_cap = R.NONE
 var source = R.NONE
 var cursor = R.NONE
 var hovered = R.NONE
 var legal_tiles = {}
+var capture_owners = {}
+var cut_off_units = {}
+var home_badges = {} # Deployed troops and the villages paying them.
+var defended_allied_tiles: Array[Vector2i] = []
 var extent = Rect2()
 var radius = 20.0
 var origin = Vector2.ZERO
@@ -105,12 +110,47 @@ func reveal_cursor():
 	if not at.is_equal_approx(inside):
 		look_at_world(view_center + (at - inside) / radius)
 
-func mark(cap, piece, options: Array):
+func mark(cap, piece, options: Array, defender: Vector2i):
+	cut_off_units.clear()
+	home_badges.clear()
+	if game.cooperative:
+		for p in game.cells:
+			var cell = game.cells[p]
+			if not cell.has("commander"):
+				continue
+			if game.deployment_cut_off(p):
+				cut_off_units[p] = true
+			var home = game.home_village(p)
+			if home == game.capitals[p] and home != R.NONE:
+				continue
+			if not game.lands.has(home):
+				home_badges[p] = "×"
+				continue
+			# Foxridge grid reference, stable across turns, undo and reloads.
+			var column = home.x + floori(home.y / 2.0)
+			var tag = String.chr(65 + column) + str(home.y + 1)
+			home_badges[p] = tag
+			home_badges[home] = tag
 	selected_cap = cap
 	source = piece
+	defended_allied_tiles.clear()
+	if game.cooperative and game.cells.has(defender):
+		var cell = game.cells[defender]
+		if game.commander(defender) == local_seat and R.guard(cell.piece) > 0:
+			if game.allied(local_seat,cell.owner):
+				defended_allied_tiles.append(defender)
+			for n in game.adjacent[defender]:
+				if game.allied(local_seat,game.cells[n].owner):
+					defended_allied_tiles.append(n)
+	capture_owners.clear()
 	legal_tiles.clear()
 	for p in options:
 		legal_tiles[p] = true
+		if game.cooperative and game.active < 2:
+			var kind = "move" if R.is_unit(game.cells[piece].piece) else "recruit"
+			var recipient = game.destination_owner(kind,p)
+			if recipient != game.cells[p].owner:
+				capture_owners[p] = recipient
 	queue_redraw()
 
 func axial_center(p: Vector2i) -> Vector2:
@@ -129,6 +169,28 @@ func outline(pos, scale_by, color, width):
 	var points = corners(pos,scale_by)
 	points.append(points[0])
 	draw_polyline(points,color,width,true)
+
+func draw_home_badge(at: Vector2, tag: String, house_color: Color):
+	var font = ThemeDB.fallback_font
+	var font_size = maxi(8,roundi(radius * 0.37))
+	var width = font.get_string_size(tag,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size).x
+	var height = font.get_height(font_size)
+	var pos = at + Vector2(-0.35,0.48) * radius
+	var box = Rect2(pos - Vector2(width,height)*0.5,Vector2(width,height)).grow_individual(2,0,2,0)
+	draw_rect(box.grow(1),INK)
+	draw_rect(box,house_color)
+	draw_string(font,box.position + Vector2(2,font.get_ascent(font_size)),tag,HORIZONTAL_ALIGNMENT_LEFT,-1,font_size,Color("#152421"))
+
+func draw_supply_warning(at: Vector2):
+	var size_px = maxf(6.0, radius * 0.27)
+	var pos = at + Vector2(-0.48,-0.40) * radius
+	var tip = pos + Vector2.UP * size_px
+	var left = pos + Vector2(-1,0.8) * size_px
+	var right = pos + Vector2(1,0.8) * size_px
+	draw_colored_polygon(PackedVector2Array([tip,left,right]),Color("#ffe099"))
+	draw_polyline(PackedVector2Array([tip,left,right,tip]),INK,maxf(1,size_px*0.16),true)
+	draw_line(pos - Vector2(0,size_px*0.39),pos + Vector2(0,size_px*0.12),INK,maxf(1.3,size_px*0.22),true)
+	draw_circle(pos + Vector2(0,size_px*0.47),maxf(0.8,size_px*0.12),INK,true,-1,true)
 
 func _draw():
 	draw_rect(Rect2(Vector2.ZERO,size), SEA)
@@ -150,7 +212,7 @@ func _draw():
 	for p in visible_cells:
 		var at = center(p)
 		var cell = game.cells[p]
-		var hue = Color(I.COLORS[house_ids[cell.owner]])
+		var hue = land_color(cell.owner)
 		var variation = posmod(p.x * 13 + p.y * 7, 7) * 0.009
 		draw_colored_polygon(corners(at,radius), hue.lightened(variation))
 		outline(at,radius,Color(0.12,0.22,0.19,0.30),1)
@@ -175,14 +237,34 @@ func _draw():
 		var at = center(p)
 		if cell.piece != R.EMPTY:
 			var side = radius * 1.56
-			var sprite = PLAYER_CAPITAL if cell.piece == R.CAPITAL and cell.owner == 0 else ICONS[cell.piece]
+			var sprite = PLAYER_CAPITAL if cell.piece == R.CAPITAL and cell.owner == local_seat else ICONS[cell.piece]
 			draw_texture_rect(sprite,Rect2(at - Vector2(side,side)*0.5,Vector2(side,side)),false)
-			if R.is_unit(cell.piece) and not cell.spent and cell.owner == game.active:
+			if cut_off_units.has(p):
+				draw_supply_warning(at)
+			if home_badges.has(p):
+				draw_home_badge(at, home_badges[p], land_color(game.commander(p)))
+			if R.is_unit(cell.piece) and not cell.spent and game.commander(p) == game.active:
 				draw_circle(at + Vector2(0.44,0.48)*radius,3.1,Color("#fff9d6"))
 		if legal_tiles.has(p):
 			var dot = at if cell.piece == R.EMPTY else at + Vector2(0.47,-0.43)*radius
-			draw_circle(dot,4,Color("#355449"))
-			draw_circle(dot,2.3,Color("#ffedb8"))
+			if capture_owners.has(p):
+				var marker_radius = clampf(radius*0.25,4,13)
+				draw_circle(dot,marker_radius,INK)
+				draw_circle(dot,marker_radius*0.76,land_color(capture_owners[p]))
+			else:
+				draw_circle(dot,4,Color("#355449"))
+				draw_circle(dot,2.3,Color("#ffedb8"))
+	# Six short inset strokes leave the house color and piece visible.
+	for p in defended_allied_tiles:
+		var poly = corners(center(p),radius * 0.85)
+		var width = clampf(radius * 0.055,1.25,3.5)
+		for i in 6:
+			var a = poly[i]
+			var b = poly[(i+1)%6]
+			var start = a.lerp(b,0.28)
+			var end = a.lerp(b,0.72)
+			draw_line(start,end,Color("#31483cbb"),width + 1.5,true)
+			draw_line(start,end,Color("#fff1cad9"),width,true)
 	if source != R.NONE:
 		outline(center(source),radius * 0.82,Color("#fff5d6"),2.3)
 	var pointer = inspected_hex()
@@ -308,3 +390,6 @@ func pick_at(local: Vector2):
 	if p != R.NONE:
 		cursor = p
 	picked.emit(p)
+
+func land_color(owner: int) -> Color:
+	return I.NEUTRAL_COLOR if owner == I.NEUTRAL else Color(I.COLORS[house_ids[owner]])

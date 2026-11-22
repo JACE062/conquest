@@ -42,6 +42,11 @@ func run_suite():
 	test_surrender()
 	await test_endgame_ui()
 	await test_end_turn_reminder()
+	await test_duel()
+	test_allied_claim()
+	test_deployed_peasant_payday()
+	await test_cooperative()
+	await test_head_to_head()
 	test_checkpoint_history()
 	test_unit_selection()
 	await test_colors_and_territory()
@@ -52,6 +57,7 @@ func run_suite():
 	test_opponent()
 	test_basin_payroll()
 	test_crossing_defense()
+	test_peasant_guard()
 	test_capture_costs()
 	test_easy_spending()
 	test_hard_strategy()
@@ -136,6 +142,41 @@ func test_crossing_defense():
 	cells[Vector2i(-1,3)] = tile(1)
 	g.setup(cells,2)
 	expect(x(0) not in g.narrow_crossings, "a coastal tile with a bypass does not tie down a guard")
+
+func test_peasant_guard():
+	var center = Vector2i.ZERO
+	var edge = x(-1)
+	var source = x(1)
+	var neutral = Vector2i(1,-2)
+	var cells = {center:tile(1),x(2):tile(1,R.CAPITAL),neutral:tile(R.Island.NEUTRAL)}
+	for offset in R.DIRS:
+		cells[offset] = tile(1)
+	cells[source].piece = R.PEASANT
+	cells[x(-2)] = tile(0,R.SPEARMAN)
+	cells[x(-3)] = tile(0,R.CAPITAL,16)
+	var follower = Vector2i(-3,1)
+	cells[follower] = tile(0,R.PEASANT)
+	var g = R.new()
+	g.setup(cells,2)
+	g.active = 1
+	finish_ai_turn(g)
+	expect(g.cells[neutral].owner == R.Island.NEUTRAL,"Standard gives up a neutral capture to cover the interior")
+	g.end_turn()
+	expect(g.apply("move",x(-2),edge) and not g.legal("move",follower,center),"a spearman can breach but a cheap follower cannot enter the guarded center")
+	cells[x(-2)].piece = R.PEASANT
+	cells[x(-3)].cash = 0
+	g.setup(cells,2)
+	g.active = 1
+	finish_ai_turn(g)
+	expect(g.cells[neutral].owner == 1,"a peasant expands when the enemy has no existing strong attacker for the breach")
+
+	# The opponent has a lone raider alongside the middle of a long holding.
+	cells = {x(0):tile(0,R.CAPITAL),x(1):tile(0),x(2):tile(0,R.PEASANT),x(3):tile(0),x(4):tile(0),
+		x(-1):tile(R.Island.NEUTRAL),Vector2i(2,-1):tile(1,R.PEASANT),Vector2i(2,-2):tile(1,R.CAPITAL)}
+	g.setup(cells,2)
+	g.active = 0
+	finish_ai_turn(g)
+	expect(g.defense(x(2)) == R.PEASANT and g.cells[x(-1)].owner == R.Island.NEUTRAL,"a peasant keeps a lone raider from cutting a village in two")
 
 func test_opening_recruitment():
 	for island in R.Island.MAPS:
@@ -415,6 +456,378 @@ func test_end_turn_reminder():
 		scene.game.cells[cap].cash = 0
 	scene.refresh()
 	expect(scene.next_village_button.disabled,"Next village disables once no village has work")
+	scene.free()
+
+func test_duel():
+	var scene = preload("res://game/main.tscn").instantiate()
+	root.add_child(scene)
+	scene.set_process(false)
+	scene.duel_button.pressed.emit()
+	for player in 2:
+		var picker = scene.duel_colors[player]
+		picker.select([5,2][player])
+		picker.item_selected.emit(picker.selected)
+		expect(scene.duel_colors[1-player].is_item_disabled(picker.selected),"the other player’s chosen color is reserved")
+	scene.duel_dialog.get_ok_button().pressed.emit()
+	await process_frame
+	var g = scene.game
+	var opening = g.cells.duplicate(true)
+	var houses = scene.board.house_ids.duplicate()
+	var palette = houses.duplicate()
+	palette.sort()
+	expect(houses.slice(0,2) == [5,2] and palette == range(6),"chosen Amber and Sage share the board with four distinct bot colors")
+	expect(scene.duel and scene.handoff.visible and scene.player_number(0) == 1,"duel starts with a named human handoff")
+	expect(g.connected_land_counts() == PackedInt32Array([7,8,8,8,9,10]),"smaller connected openings play first")
+	expect(scene.difficulty_selector.disabled and scene.difficulty_selector.get_selected_id() == AI.Difficulty.STANDARD,"duel bots use Standard")
+	for seat in 2:
+		scene.handoff.get_ok_button().pressed.emit()
+		await process_frame
+		expect(g.active == seat and scene.board.local_seat == seat and scene.history.is_empty(),"each human controls their own opening")
+		scene.choose_purchase("recruit")
+		var targets = g.targets("recruit",scene.selected)
+		expect(not targets.is_empty(),"each duel opening can recruit")
+		scene.pick(targets[0])
+		expect(scene.history.size() == 1 and g.cells[targets[0]].owner == seat,"both humans can issue orders")
+		scene.undo()
+		scene.end_button.pressed.emit()
+		scene.end_turn_dialog.end_button.pressed.emit()
+		await process_frame
+	var opponents = {}
+	for i in 300:
+		if scene.human_turn(): break
+		opponents[g.active] = true
+		scene._process(1.0)
+	expect(opponents.size() == 4 and g.active == 0 and g.round_number == 2,"four bot turns return play to the first human")
+	scene.handoff.hide()
+	scene.duel_button.pressed.emit()
+	scene.concede_button.pressed.emit()
+	expect(scene.concession.visible and "Player 2" in scene.concession.title,"joint proposal is addressed to the other player")
+	var position = g.cells.duplicate(true)
+	scene.concession.get_cancel_button().pressed.emit()
+	await process_frame
+	expect(not scene.concession.visible and not scene.finished and g.active == 0 and g.cells == position,"declining preserves the current turn")
+	scene.duel_button.pressed.emit()
+	scene.resign_button.pressed.emit()
+	scene.resignation.get_ok_button().pressed.emit()
+	expect(scene.finished and scene.result_dialog.title == "Player 2 wins" and "Round 2" in scene.result_dialog.dialog_text,"resignation awards the opponent the duel")
+	scene.show_territory()
+	expect(scene.territory_graph.visible and g.cells == position,"concession history preserves actual ownership")
+	scene.territory_graph.hide()
+	scene.return_from_graph()
+	await process_frame
+	scene.result_dialog.get_ok_button().pressed.emit()
+	await process_frame
+	expect(scene.game.cells == opening and scene.player_number(0) == 2 and scene.player_number(1) == 1,
+		"rematch exchanges the humans on the identical first-round board")
+	expect(scene.board.house_ids[0] == houses[1] and scene.board.house_ids[1] == houses[0],"human colors follow the players")
+	scene.handoff.hide()
+	scene.duel_button.pressed.emit()
+	scene.concede_button.pressed.emit()
+	expect("Player 1" in scene.concession.title,"joint confirmation follows the swapped player numbers")
+	scene.concession.get_ok_button().pressed.emit()
+	expect(scene.finished and scene.result_dialog.title == "Joint concession" and "computer houses" in scene.result_dialog.dialog_text,"both humans can concede without a human winner")
+	scene.free()
+
+func test_deployed_peasant_payday():
+	var g = R.new()
+	g.cooperative = true
+	var raider = Vector2i(3,-1)
+	var cells = {x(0):tile(0,R.CAPITAL,60), x(1):tile(0,R.PEASANT), x(2):tile(0,R.PEASANT),
+		x(3):tile(1), x(4):tile(1,R.PINE), x(5):tile(1,R.PALM), x(6):tile(1,R.KNIGHT),
+		x(7):tile(1,R.CAPITAL,60), raider:tile(2,R.SPEARMAN), Vector2i(4,-1):tile(2,R.CAPITAL,30)}
+	# Larger Ochre village can absorb the original paying village.
+	for n in range(-5,-1):
+		cells[x(n)] = tile(0)
+	cells[x(-5)] = tile(0,R.CAPITAL,20)
+	cells[x(-1)] = tile(R.Island.NEUTRAL)
+	g.setup(cells,6)
+	var initial_income = g.finances(x(7)).x
+	expect(not g.legal("recruit",x(0),x(4)), "allied forestry requires a deployed unit")
+	for n in [1,2]:
+		var target = x(n+3)
+		expect(target in g.targets("move",x(n)) and g.apply("move",x(n),target),"a deployed peasant can clear allied woodland")
+		expect(g.cells[target].spent and g.cells[target].owner == 1 and g.home_village(target) == x(0),"clearing spends the visitor and preserves the host's land")
+	expect(g.finances(x(7)).x == initial_income + 2 and g.finances(x(0)).y == 4,"both clearings restore host income and charge wages to Ochre")
+	var deployed = g.cells.duplicate(true)
+	var cash = g.cells[x(0)].cash
+	g.end_turn()
+	expect(g.cells[x(4)].spent and g.cells[x(5)].spent,"Amber's payday does not refresh Ochre's workers")
+	g.end_turn()
+	g.end_turn()
+	expect(g.active == 0 and g.cells[x(0)].cash == cash + g.finances(x(0)).x - 4 and not g.cells[x(4)].spent and not g.cells[x(5)].spent and g.army(x(0)).size() == 2,"both connected peasants survive and draw one payday")
+	g.restore(deployed)
+	g.cells[x(7)].cash = 0
+	g.end_turn()
+	expect(g.cells[x(6)].piece == R.GRAVE and g.army(x(0)).size() == 2,"host bankruptcy affects its own knight but spares the visiting peasants")
+	g.active = 0
+	g.restore(deployed)
+	expect(g.apply("recruit",x(0),x(-1)) and g.home_village(x(4)) == x(-5) and g.home_village(x(5)) == x(-5),"a merged treasury inherits both workers")
+	g.begin_turn()
+	expect(g.cells[x(4)].piece == R.PEASANT and g.cells[x(5)].piece == R.PEASANT,"both workers survive the merger and payday")
+	g.restore(deployed)
+	g.end_turn()
+	g.end_turn()
+	expect(g.active == 2 and g.apply("move",raider,x(3)),"a bot cuts the only supply route")
+	var cut = g.cells.duplicate(true)
+	g.end_turn()
+	expect(g.active == 0 and g.cells[x(0)].cash >= 60 and g.cells[x(4)].piece == R.GRAVE and g.cells[x(5)].piece == R.GRAVE,"both disconnected workers die at payday despite ample home cash")
+	g.restore(cut)
+	g.active = 1
+	expect(g.apply("move",x(6),x(3)),"Amber can retake the crossing before Ochre's payday")
+	g.end_turn()
+	g.end_turn()
+	expect(g.active == 0 and g.cells[x(4)].piece == R.PEASANT and g.cells[x(5)].piece == R.PEASANT and g.finances(x(0)).y == 4,"both workers survive once the route reopens")
+
+func test_allied_claim():
+	var g = R.new()
+	g.cooperative = true
+	for owner in 2:
+		for kind in ["move","recruit"]:
+			for terrain in [R.EMPTY,R.PALM,R.PINE,R.GRAVE]:
+				var target = x(2)
+				var cells = {x(0):tile(owner,R.CAPITAL,20),x(1):tile(owner,R.PEASANT),target:tile(1-owner,terrain),
+					Vector2i(1,1):tile(owner,R.CASTLE),x(3):tile(2,R.PEASANT),x(4):tile(2,R.CAPITAL)}
+				g.setup(cells,6)
+				g.active = 2
+				expect(not g.legal("move",x(3),target),"allied coverage still blocks a bot raid")
+				g.active = owner
+				var source = x(1) if kind == "move" else x(0)
+				expect(g.defense(target) == 2 and target in g.targets(kind,source),"covered allied remnant is a legal claim")
+				expect(g.apply(kind,source,target) and g.capitals[target] == x(0) and g.cells[target].owner == owner,"claim joins the acting village")
+				expect(g.cells[target].piece == R.PEASANT and g.cells[target].spent and not g.cells[target].has("breached"),"claim clears terrain and spends the unit without a breach")
+				expect(g.cells[x(0)].cash == (10 if kind == "recruit" else 20),"only a recruit costs coins")
+				g.restore(cells)
+				expect(g.cells[target].owner == 1-owner and g.cells[target].piece == terrain and g.capitals[target] == R.NONE,"undo restores the partner's isolated tile")
+				for piece in [R.PEASANT,R.CASTLE]:
+					g.cells[target].piece = piece
+					expect(not g.legal(kind,source,target),"allied pieces remain protected on isolated land")
+
+func test_cooperative():
+	var scene = preload("res://game/main.tscn").instantiate()
+	root.add_child(scene)
+	scene.set_process(false)
+	scene.duel_button.pressed.emit()
+	scene.duel_format.select(2)
+	scene.duel_format.item_selected.emit(2)
+	var scroll = scene.duel_format.get_parent().get_parent()
+	var normal_size = scene.duel_dialog.size
+	for dialog_size in [Vector2i(460,310),Vector2i(330,210)]:
+		scene.duel_dialog.size = dialog_size
+		await process_frame
+		await process_frame
+		expect(scroll.get_global_rect().end.y <= scene.duel_dialog.get_ok_button().get_global_rect().position.y,"co-op form stays above action buttons at %s" % dialog_size)
+		scroll.ensure_control_visible(scene.duel_colors[1])
+		await process_frame
+		expect(scroll.get_global_rect().encloses(scene.duel_colors[1].get_global_rect()),"second color picker can be fully displayed at %s" % dialog_size)
+	scene.duel_dialog.size = normal_size
+	for seat in 2:
+		scene.duel_colors[seat].select([0,5][seat])
+		scene.duel_colors[seat].item_selected.emit([0,5][seat])
+	scene.duel_dialog.get_ok_button().pressed.emit()
+	await process_frame
+	var g = scene.game
+	expect(g.cooperative and scene.board.house_ids.slice(0,2) == [0,5] and scene.handoff.visible,"Foxridge allies can choose distinct colors")
+	var shared_edges = 0
+	for p in g.cells:
+		if g.cells[p].owner == 0 and g.capitals[p] != R.NONE:
+			for n in g.adjacent[p]:
+				if g.cells[n].owner == 1 and g.capitals[n] != R.NONE:
+					shared_edges += 1
+	expect(shared_edges == 4,"allies open with neighboring village territories")
+	for seat in 2:
+		scene.handoff.hide()
+		expect(g.active == seat and scene.board.local_seat == seat,"co-op hands control to each ally")
+		var other_treasuries = {}
+		for cap in g.lands:
+			if g.cells[cap].owner == 1-seat:
+				other_treasuries[cap] = g.cells[cap].cash
+		scene.choose_purchase("recruit")
+		var target = g.targets("recruit",scene.selected)[0]
+		scene.pick(target)
+		expect(g.cells[target].owner == seat and g.cells[target].piece == R.PEASANT,"allied recruits belong to the purchasing house")
+		for cap in other_treasuries:
+			expect(g.cells[cap].cash == other_treasuries[cap],"partner treasury is independent")
+		scene.next_player()
+	var bots = {}
+	for step in 300:
+		if scene.human_turn(): break
+		bots[g.active] = true
+		scene._process(1.0)
+	expect(bots.size() == 4 and g.round_number == 2 and scene.difficulty_selector.get_selected_id() == AI.Difficulty.STANDARD,"four Standard bots finish the co-op round")
+	scene.handoff.hide()
+	var cells = {x(0):tile(0,R.CAPITAL,25),x(1):tile(0,R.BARON),x(2):tile(1),x(3):tile(1),x(4):tile(1,R.CAPITAL,20),
+		Vector2i(2,-1):tile(2,R.PEASANT),Vector2i(3,-2):tile(2,R.CAPITAL,20)}
+	g.setup(cells,6)
+	scene.pick(x(1))
+	expect(scene.board.defended_allied_tiles == [x(2)] and scene.board.legal_tiles.has(x(2)) and not scene.board.capture_owners.has(x(2)),"a selected unit marks only adjacent partner land, separately from destinations")
+	scene.pick(R.NONE)
+	expect(scene.board.defended_allied_tiles.is_empty(),"clearing selection removes allied coverage")
+	g.cells[x(1)].spent = true
+	scene.pick(x(1))
+	expect(scene.mode == "" and scene.board.defended_allied_tiles == [x(2)],"spent units can be inspected without arming a move")
+	g.active = 1
+	scene.pick(x(4))
+	expect(scene.board.defended_allied_tiles.is_empty(),"switching to a distant village clears prior coverage")
+	g.setup({x(0):tile(0),x(1):tile(0,R.CAPITAL),x(2):tile(1,R.CAPITAL),x(3):tile(1)},6)
+	scene.pick(x(2))
+	expect(scene.board.defended_allied_tiles == [x(1)],"Player 2 can inspect a village protecting Player 1")
+	g.cooperative = false
+	scene.refresh()
+	expect(scene.board.defended_allied_tiles.is_empty(),"competitive seats never see allied coverage")
+	g.cooperative = true
+	g.setup(cells,6)
+	g.active = 0
+	expect(g.legal("move",x(1),x(2)) and not g.legal("recruit",x(0),x(2)) and not g.legal("build",x(0),x(2)),"only existing troops can enter partner territory")
+	var shared = Vector2i(1,1)
+	var remote = Vector2i(3,1)
+	var frontier = cells.duplicate(true)
+	frontier[shared] = tile(2)
+	frontier[remote] = tile(2,R.CASTLE)
+	frontier[x(0)].cash = 80
+	g.setup(frontier,6)
+	scene.clear_order()
+	scene.pick(x(1))
+	scene.pick(x(3))
+	expect(g.cells[x(3)].owner == 1 and g.commander(x(3)) == 0 and scene.selected == x(0),"deployment keeps the host's land and selects the paying village")
+	scene.pick(x(3))
+	expect(scene.source == x(3) and scene.board.capture_owners.get(shared,-1) == 0 and scene.board.capture_owners.get(remote,-1) == 1,"from Amber land the preview awards a shared border to Ochre and a remote border to Amber")
+	scene.inspect(shared)
+	expect(scene.house_name(0) in scene.tile_info.text,"inspection names the capturing house")
+	scene.pick(shared)
+	expect(g.cells[shared].owner == 0 and g.commander(shared) == 0 and g.cells[shared].spent,"shared border capture goes to the commander")
+	scene.undo()
+	scene.pick(x(3))
+	scene.pick(remote)
+	expect(g.cells[remote].owner == 1 and g.commander(remote) == 0 and g.home_village(remote) == x(0),"host-only castle capture retains the visiting unit and its home")
+	expect(g.finances(x(4)).y == 0 and g.finances(x(0)).y == R.WAGES[R.BARON],"only the home village owes expedition wages")
+	g.active = 1
+	g.begin_turn()
+	expect(g.cells[remote].spent and not g.legal("move",remote,x(3)) and not g.legal("recruit",x(4),remote),"host cannot refresh, move or merge with visitor")
+	g.active = 0
+	var ledger = g.finances(x(0))
+	var cash = g.cells[x(0)].cash
+	g.begin_turn()
+	expect(not g.cells[remote].spent and g.cells[x(0)].cash == cash+ledger.x-ledger.y,"commander refreshes the visitor and pays its bill")
+	var supplied = g.cells.duplicate(true)
+	var second_village = {x(0):tile(0,R.CAPITAL),x(1):tile(0,R.PEASANT),x(2):tile(1,R.CAPITAL),x(3):tile(1),x(4):tile(0),x(5):tile(0,R.CAPITAL)}
+	g.setup(second_village,6)
+	expect(g.apply("move",x(1),x(3)),"unit can visit its partner")
+	scene.refresh()
+	expect(scene.board.home_badges == {x(0):"A1",x(3):"A1"},"visiting unit and its paying village share a tag")
+	expect(g.apply("move",x(3),x(4)),"unit can continue to a second friendly village")
+	scene.refresh()
+	expect(scene.board.home_badges == {x(0):"A1",x(4):"A1"},"same-color visit identifies the home village without selecting the unit")
+	scene.inspect(x(4))
+	expect("Home A1" in scene.tile_info.text,"inspecting the visiting unit identifies its home")
+	expect(g.apply("move",x(4),x(1)),"visiting unit can return home")
+	scene.refresh()
+	expect(scene.board.home_badges.is_empty(),"last returning troop clears both badges")
+	g.setup(supplied,6)
+	g.cells[x(0)].cash = 0
+	g.begin_turn()
+	expect(g.cells[remote].piece == R.GRAVE and g.cells[x(4)].cash == supplied[x(4)].cash,"a home village that misses payroll loses its deployed unit")
+	g.restore(supplied)
+	g.cells[x(2)].owner = 2
+	g.rebuild()
+	for seat in [0,1]:
+		g.active = seat
+		scene.refresh()
+		expect(scene.board.cut_off_units.keys() == [remote],"either player sees only the disconnected troop marked")
+		scene.pick(remote)
+		expect("Ochre" in scene.status.text and "payday" in scene.status.text,"touch inspection names the commander's deadline")
+	g.restore(supplied)
+	scene.refresh()
+	expect(scene.board.cut_off_units.is_empty(),"reopening the route removes the warning before payday")
+	g.cells[x(2)].owner = 2
+	g.rebuild()
+	g.active = 0
+	g.begin_turn()
+	scene.refresh()
+	expect(scene.board.cut_off_units.is_empty(),"starvation removes the troop's marker")
+	expect(g.cells[remote].piece == R.GRAVE and not g.cells[remote].has("commander"),"cut-off visitor starves at its owner's payday")
+	g.setup(cells,6)
+	g.active = 2
+	for defender in [R.PEASANT,R.SPEARMAN,R.KNIGHT,R.BARON,R.CASTLE,R.CAPITAL]:
+		g.cells[x(1)].piece = defender
+		expect(g.defense(x(2)) == R.guard(defender) and not g.legal("move",Vector2i(2,-1),x(2)),"allied defender blocks a bot peasant at its normal rank")
+	g.cells[x(1)].piece = R.CASTLE
+	g.cells[Vector2i(2,-1)].piece = R.KNIGHT
+	expect(g.legal("move",Vector2i(2,-1),x(2)),"a bot knight can breach an allied castle's coverage")
+	g.setup({x(0):tile(1,R.CAPITAL),x(1):tile(1),x(2):tile(2),x(3):tile(2,R.CAPITAL)},6)
+	scene.check_result()
+	expect(not scene.finished,"a surviving ally can carry on")
+	g.setup({x(0):tile(1,R.CAPITAL),x(1):tile(1),x(2):tile(2)},6)
+	scene.check_result()
+	expect(scene.finished and scene.result_dialog.title == "Alliance victory","both players win when the last bot falls")
+	scene.result_dialog.hide()
+	scene.swap_rematch()
+	expect(scene.game.cooperative and scene.board.house_ids.slice(0,2) == [5,0],"swapped rematch preserves the alliance and player colors")
+	scene.handoff.hide()
+	scene.game.setup({x(0):tile(0),x(1):tile(2),x(2):tile(2,R.CAPITAL)},6)
+	scene.check_result()
+	expect(scene.finished and scene.result_dialog.title == "Alliance defeated","the match ends when both allies fall")
+	scene.free()
+
+func test_head_to_head():
+	var scene = preload("res://game/main.tscn").instantiate()
+	root.add_child(scene)
+	scene.duel_button.pressed.emit()
+	scene.duel_format.select(1)
+	scene.duel_format.item_selected.emit(1)
+	scene.duel_dialog.get_ok_button().pressed.emit()
+	await process_frame
+	var g = scene.game
+	var opening = g.cells.duplicate(true)
+	expect(g.players == 2 and g.lands.size() == 2 and g.connected_land_counts() == PackedInt32Array([4,4]),"direct duel has two equal villages")
+	expect(g.territory_counts()[1] == g.connected_land_counts(),"neutral land counts for neither house")
+	for seat in 2:
+		scene.handoff.hide()
+		var cap = scene.selected
+		var target = R.NONE
+		for p in g.targets("recruit",cap):
+			if g.cells[p].owner == R.Island.NEUTRAL:
+				target = p
+				break
+		expect(target != R.NONE and g.cells[cap].cash == 20,"each village opens with two recruitment fees and neutral targets")
+		scene.choose_purchase("recruit")
+		scene.pick(target)
+		expect(g.connected_land_counts()[seat] == 5 and g.cells[target].spent,"capturing neutral land gains one hex")
+		scene.undo()
+		expect(g.cells[target].owner == R.Island.NEUTRAL and g.capitals[target] == R.NONE,"undo restores unowned land")
+		scene.next_player()
+	expect(g.active == 0 and g.round_number == 2,"two human turns complete the round")
+	scene.handoff.hide()
+	scene.swap_rematch()
+	expect(scene.game.cells == opening and scene.player_number(0) == 2,"direct rematch exchanges positions on the same island")
+	scene.handoff.hide()
+	for cell in scene.game.cells.values():
+		if cell.owner == 1:
+			cell.owner = R.Island.NEUTRAL
+			cell.piece = R.EMPTY
+	scene.game.rebuild()
+	scene.check_result()
+	expect(scene.finished and scene.result_dialog.title == "Player 2 wins","last village wins even with unclaimed land")
+	scene.result_dialog.get_ok_button().pressed.emit()
+	await process_frame
+	expect(scene.duel_options.visible and scene.reverse_button.visible,"Twin Shoals results offer both rematch choices")
+	var colors = scene.board.house_ids.duplicate()
+	scene.reverse_button.pressed.emit()
+	scene.duel_dialog.get_ok_button().pressed.emit()
+	await process_frame
+	g = scene.game
+	expect(g.active == 1 and scene.player_number(1) == 1 and scene.board.house_ids == colors,"reverse keeps the swapped players in their villages and opens with east")
+	for p in opening:
+		expect(g.cells[p].owner == opening[p].owner and g.cells[p].piece == opening[p].piece,"reversal preserves village geometry and pieces")
+	expect(g.cells[scene.selected].cash == 20 and g.round_number == 1,"east receives the first opening income")
+	scene.handoff.hide()
+	scene.next_player()
+	expect(g.active == 0 and g.round_number == 1 and g.cells[scene.selected].cash == 20,"west receives its first income in the same round")
+	scene.handoff.hide()
+	scene.next_player()
+	expect(g.active == 1 and g.round_number == 2,"the new round starts in the east")
+	scene.handoff.hide()
+	scene.swap_rematch()
+	expect(scene.game.active == 1 and scene.player_number(1) == 2,"swapping after reversal exchanges players and keeps the eastern opening")
 	scene.free()
 
 func test_checkpoint_history():

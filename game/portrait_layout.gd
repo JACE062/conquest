@@ -113,6 +113,7 @@ func setup(ui, desktop_layout, colors, difficulty, help, restart, standings):
 		ui.label(field,pair[0],15,ui.LIGHT)
 		share(pair[1],field)
 	var commands = ui.row(options,8)
+	share(ui.duel_button,ui.row(options,0))
 	share(help,commands)
 	share(restart,commands)
 	var summary = ui.column(ui.margin(ui.panel(options,ui.PAPER),12,10),4)

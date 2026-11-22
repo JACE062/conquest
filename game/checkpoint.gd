@@ -26,8 +26,10 @@ static func read() -> Dictionary:
 	if bytes.is_empty():
 		return {}
 	var data = bytes_to_var(bytes)
-	if data is Dictionary and data.has_all(["island","houses","difficulty","cells","round","wait","graph","undo","selected","source","mode","cursor","zoom","center"]) and data.island in preload("res://game/island.gd").MAPS:
-		return data
+	if data is Dictionary and data.has_all(["island","houses","difficulty","cells","round","wait","graph","undo","selected","source","mode","cursor","zoom","center"]):
+		const Island = preload("res://game/island.gd")
+		if data.island in Island.MAPS or (data.island == Island.HEAD_TO_HEAD and data.get("duel",false)):
+			return data
 	return {}
 
 static func clear():

@@ -147,6 +147,73 @@ static func leaves_crossing(g, guards: Dictionary, unit, target) -> bool:
 				return true
 	return false
 
+# Extending past a single entrance gives a spearman two hexes for one
+# capture. A peasant placed alongside the entrance can keep a second route.
+static func fragile_extension(g, target, cap, breach_ranks) -> bool:
+	if g.cells[target].owner != R.Island.NEUTRAL:
+		return false
+	var entrance = R.NONE
+	for n in g.adjacent[target]:
+		if g.capitals[n] == cap:
+			if entrance != R.NONE:
+				return false
+			entrance = n
+	return entrance != R.NONE and attacking_rank(g,entrance,breach_ranks) > maxi(R.PEASANT,g.defense(entrance))
+
+# An inexpensive capture can cost a village its connection, or leave a
+# peasant free to follow a stronger attacker through a newly opened border.
+static func cheap_followup(g, site, cap, armies, followups) -> bool:
+	for edge in g.adjacent[site]:
+		if g.capitals[edge] != cap:
+			continue
+		var defense = maxi(R.PEASANT,g.defense(edge))
+		for n in g.adjacent[edge]:
+			var enemy = g.capitals[n]
+			if followups.has(enemy) and armies[enemy] > defense:
+				return true
+	return false
+
+static func interior_guard(g, cap, armies, breach_ranks, followups, ready, guards) -> Array:
+	var land = g.lands[cap]
+	for site in land:
+		if R.guard(g.cells[site].piece) > R.PEASANT:
+			continue
+		var threat = attacking_rank(g, site, armies)
+		var needs_guard = false
+		if threat == R.PEASANT and site != cap and attacking_rank(g,site,breach_ranks) == R.PEASANT:
+			needs_guard = g.component(cap,site).size() + 1 < land.size()
+		elif threat == 0:
+			needs_guard = cheap_followup(g,site,cap,armies,followups)
+		if not needs_guard:
+			continue
+		var existing = R.NONE
+		var covered = false
+		for post in [site] + g.adjacent[site]:
+			if g.cells[post].owner != g.active or R.guard(g.cells[post].piece) == 0:
+				continue
+			# A piece on the breach itself disappears in the first attack.
+			if threat == 0 and attacking_rank(g,post,armies) > R.guard(g.cells[post].piece):
+				continue
+			if post not in ready or existing != R.NONE:
+				covered = true
+				break
+			existing = post
+		if covered:
+			continue
+		if existing != R.NONE:
+			# Keep this peasant out of reach of the initial attack.
+			if not guards.has(existing):
+				guards[existing] = []
+			guards[existing].append(site)
+			continue
+		for post in [site] + g.adjacent[site]:
+			if g.cells[post].piece != R.EMPTY or attacking_rank(g,post,armies) > 0:
+				continue
+			for unit in ready:
+				if not guards.has(unit) and g.legal("move",unit,post):
+					return ["move",unit,post]
+	return []
+
 # A castle must cover the crossing and at least two other village tiles.
 static func crossing_castle_site(g, cap, crossing, armies) -> Vector2i:
 	var attack = attacking_rank(g, crossing, armies)
@@ -205,7 +272,7 @@ static func preventive_clearing(g, move: Array) -> Array:
 	var target = g.cells[move[2]]
 	if g.cells[peasant].piece != R.PEASANT or target.owner == g.active or target.piece != R.EMPTY:
 		return move
-	var cap = g.capitals[peasant]
+	var cap = g.home_village(peasant)
 	if g.cells[cap].cash >= 10:
 		return move
 	var land = g.lands[cap]
@@ -307,16 +374,20 @@ static func gifts_productive_capitals(g, target) -> bool:
 static func link_covers_payroll(g, unit, target) -> bool:
 	var joins_land = false
 	for n in g.adjacent[target]:
-		if g.cells[n].owner == g.active and g.capitals[n] != g.capitals[unit]:
+		if g.cells[n].owner == g.active and g.capitals[n] != g.home_village(unit):
 			joins_land = true
 			break
 	if not joins_land or not g.legal("move", unit, target):
 		return false
 	var preview = R.new()
+	preview.cooperative = g.cooperative
 	preview.setup(g.cells, g.players)
 	preview.active = g.active
-	preview.apply("move", unit, target)
-	var cap = preview.capitals[target]
+	if not preview.apply("move", unit, target):
+		return false
+	var cap = preview.home_village(target)
+	if not preview.lands.has(cap):
+		return false
 	return preview.cells[cap].cash + payday_income(preview, preview.lands[cap]) >= preview.finances(cap).y
 
 static func protective_castle(g, cap, armies: Dictionary, purchase: Array) -> Array:
@@ -468,15 +539,28 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 	var payroll_guards = {}
 	var payroll_links = []
 	var enemy_strength = {}
+	var followups = {}
+	var breach_ranks = {}
 	for enemy in g.lands:
-		if g.cells[enemy].owner != g.active:
+		if g.cells[enemy].owner != g.active and not g.allied(g.active,g.cells[enemy].owner):
 			var strength = 1
+			var soldiers = 0
+			var peasants = 0
 			for p in g.lands[enemy]:
 				strength = maxi(strength, R.guard(g.cells[p].piece))
 				if not easy and R.is_unit(g.cells[p].piece):
+					soldiers += 1
+					peasants += int(g.cells[p].piece == R.PEASANT)
 					enemy_armies[enemy] = maxi(enemy_armies.get(enemy, 0), g.cells[p].piece)
-			if difficulty == Difficulty.STANDARD and g.cells[enemy].cash >= 10:
-				enemy_armies[enemy] = maxi(R.PEASANT, enemy_armies.get(enemy, 0))
+			if difficulty == Difficulty.STANDARD:
+				var can_hire = g.cells[enemy].cash >= R.RECRUIT_COST
+				if can_hire:
+					enemy_armies[enemy] = maxi(R.PEASANT,enemy_armies.get(enemy,0))
+				var attack = enemy_armies.get(enemy,0)
+				if attack >= R.SPEARMAN and (peasants > 0 or can_hire):
+					followups[enemy] = true
+				var can_merge = soldiers >= 2 or (soldiers > 0 and can_hire)
+				breach_ranks[enemy] = maxi(attack,R.SPEARMAN if can_merge else 0)
 			enemy_strength[enemy] = strength
 	var guards = crossing_guards(g, enemy_armies) if difficulty == Difficulty.STANDARD else {}
 	for cap in g.lands:
@@ -486,6 +570,7 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 		var budget = g.finances(cap)
 		var cash = g.cells[cap].cash
 		var frontier = {}
+		var open_frontier = false
 		var troops = []
 		var clearings = []
 		var woods = []
@@ -493,7 +578,8 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 		for p in land:
 			var piece = g.cells[p].piece
 			if R.is_unit(piece):
-				troops.append(p)
+				if g.commander(p) == g.active and g.home_village(p) == cap:
+					troops.append(p)
 			elif piece == R.EMPTY:
 				clearings.append(p)
 			elif R.is_tree(piece) or piece == R.GRAVE:
@@ -502,6 +588,15 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 			for n in g.adjacent[p]:
 				if g.cells[n].owner != g.active:
 					frontier[n] = true
+					if g.cells[n].owner == R.Island.NEUTRAL:
+						open_frontier = true
+		if g.cooperative and g.active < 2:
+			troops = g.army(cap)
+			frontier.clear()
+			for p in g.supply_route(cap):
+				for n in g.adjacent[p]:
+					if g.cells[n].owner != g.active and (not g.allied(g.active,g.cells[n].owner) or g.claimable_allied_hex(g.active,n)):
+						frontier[n] = true
 		var ready_rank = 0
 		# Clear sources that threaten open land before working into dense forest.
 		var best_tree = R.NONE
@@ -554,6 +649,13 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 				ready_rank = maxi(ready_rank, rank)
 		var capture_values = [0, 0, 0, 0, 0]
 		var surplus = budget.x - budget.y
+		if difficulty == Difficulty.STANDARD and not ready[R.PEASANT].is_empty() and surplus >= 0 and open_frontier:
+			var post = interior_guard(g,cap,enemy_armies,breach_ranks,followups,ready[R.PEASANT],guards)
+			# Just above an ordinary open-land capture. Rescues, village
+			# links, attacking troops, and urgent forestry still take priority.
+			if not post.is_empty() and highest < 40:
+				best = post
+				highest = 40
 		if (difficulty == Difficulty.STANDARD and land.size() >= ESTABLISHED_CROSSING_LAND
 				and holding_rank >= R.SPEARMAN and troops.size() >= 2
 				and surplus >= 0 and cash >= 10 and cash + expected_surplus >= 15):
@@ -618,6 +720,8 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 				value = 52 - 6 * guard - 4 * R.guard(g.cells[target].piece) - 24 * deployed
 			else:
 				value = capture_value(g, target, cap) + 4 * guard
+				if difficulty == Difficulty.STANDARD and fragile_extension(g,target,cap,breach_ranks):
+					value -= 18
 			if rescues_army:
 				value += CAPITAL_BONUS
 				payroll_links.append(["move", last_unit, target])
@@ -671,7 +775,7 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 			if not easy and (castle_assault or exploit_breach or blocked) and ready_rank < R.BARON and priority > highest:
 				var order = reinforce(cash, cap, target, guard + 1, ready, clearings,
 					surplus, established_income, troops_by_rank, hard, growth_loss)
-				if not order.is_empty() and not payroll_guards.has(order[1]) and not leaves_crossing(g, guards, order[1], order[2]) and added_wages(g, order) <= wage_room:
+				if not order.is_empty() and g.legal(order[0],order[1],order[2]) and not payroll_guards.has(order[1]) and not leaves_crossing(g, guards, order[1], order[2]) and added_wages(g, order) <= wage_room:
 					highest = priority
 					best = order
 		for unit in troops:
@@ -712,7 +816,7 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 					if score > clear_score:
 						clear_score = score
 						destination = tree
-			if destination != R.NONE and highest < clear_score and not leaves_crossing(g, guards, unit, destination):
+			if destination != R.NONE and highest < clear_score and g.legal("move",unit,destination) and not leaves_crossing(g, guards, unit, destination):
 				highest = clear_score
 				best = ["move",unit,destination]
 		if frontier.is_empty():
@@ -738,7 +842,7 @@ static func choose(g, difficulty: Difficulty = Difficulty.STANDARD) -> Array:
 		if payroll_guards.has(best[1]) or best in payroll_links:
 			return best
 		var clearing = preventive_clearing(g, best)
-		return best if leaves_crossing(g, guards, clearing[1], clearing[2]) else clearing
+		return best if leaves_crossing(g, guards, clearing[1], clearing[2]) or not g.legal(clearing[0],clearing[1],clearing[2]) else clearing
 	if difficulty == Difficulty.STANDARD and not best.is_empty() and best[0] == "recruit":
 		var cap = g.capitals[best[1]]
 		var cash = g.cells[cap].cash

@@ -13,13 +13,18 @@ var lands = {} # Capital -> array of land coordinates.
 var adjacent = {}
 var narrow_crossings: Array[Vector2i] = []
 var active = 0
+var cooperative = false
+var supply_routes = {} # Rebuilt lazily after territory changes.
+var first_seat = 0
 var round_number = 1
 var players = 6
 var surrender_wait = 0
 
-static func new_game(rows: Array = Island.ROWS, palms: Array = Island.PALMS):
+static func new_game(rows: Array = Island.ROWS, palms: Array = Island.PALMS, player_count = 6, opening_seat = 0):
 	var game = new()
-	game.setup(Island.tiles(rows), 6)
+	game.setup(Island.tiles(rows), player_count)
+	game.first_seat = opening_seat
+	game.active = opening_seat
 	for location in palms:
 		if game.cells.has(location) and game.cells[location].piece == EMPTY:
 			game.cells[location].piece = PALM if game.adjacent[location].size() < 6 else PINE
@@ -137,11 +142,15 @@ func replacement(group: Array) -> Vector2i:
 	return best
 
 func rebuild():
+	supply_routes.clear()
 	var old_lands = lands
 	lands = {}
 	capitals.clear()
 	for p in cells:
 		if capitals.has(p):
+			continue
+		if cells[p].owner == Island.NEUTRAL:
+			capitals[p] = NONE
 			continue
 		var group = component(p)
 		var cap = NONE
@@ -174,6 +183,71 @@ func rebuild():
 		for n in group:
 			capitals[n] = cap
 
+	if cooperative:
+		for cell in cells.values():
+			if not cell.has("commander"):
+				continue
+			if not is_unit(cell.piece):
+				clear_commander(cell)
+				continue
+			var home = cell.home
+			if cells.has(home) and cells[home].owner == cell.commander:
+				cell.home = capitals[home]
+			else:
+				cell.home = NONE
+
+func commander(p: Vector2i) -> int:
+	return cells[p].get("commander",cells[p].owner)
+
+func home_village(p: Vector2i) -> Vector2i:
+	return cells[p].get("home",capitals[p])
+
+static func clear_commander(cell: Dictionary):
+	cell.erase("commander")
+	cell.erase("home")
+
+func army(cap: Vector2i) -> Array:
+	var units = []
+	var tiles = cells if cooperative and lands.has(cap) and cells[cap].owner in [0,1] else lands.get(cap,[])
+	for p in tiles:
+		if is_unit(cells[p].piece) and home_village(p) == cap:
+			units.append(p)
+	return units
+
+# Only village-connected territory carries supply. Movement within it, like
+# movement within a single holding, is independent of distance or occupancy.
+func supply_route(cap: Vector2i) -> Dictionary:
+	if not lands.has(cap):
+		return {}
+	if not supply_routes.has(cap):
+		var route = {cap:true}
+		var queue = [cap]
+		var i = 0
+		while i < queue.size():
+			for n in adjacent[queue[i]]:
+				if not route.has(n) and capitals[n] != NONE and cells[n].owner in [0,1]:
+					route[n] = true
+					queue.append(n)
+			i += 1
+		for village in lands:
+			if route.has(village):
+				supply_routes[village] = route
+	return supply_routes[cap]
+
+func deployment_cut_off(p: Vector2i) -> bool:
+	var cell = cells[p]
+	return cell.has("commander") and not supply_route(cell.home).has(p)
+
+func destination_owner(kind: String, target: Vector2i) -> int:
+	if kind != "move" or not cooperative or active >= 2 or cells[target].owner == active:
+		return active
+	if allied(active,cells[target].owner):
+		return active if claimable_allied_hex(active,target) else cells[target].owner
+	for n in adjacent[target]:
+		if cells[n].owner == active and capitals[n] != NONE:
+			return active
+	return 1-active
+
 func connected_land_counts() -> PackedInt32Array:
 	var connected := PackedInt32Array()
 	connected.resize(players)
@@ -185,7 +259,8 @@ func territory_counts() -> Array[PackedInt32Array]:
 	var owned := PackedInt32Array()
 	owned.resize(players)
 	for cell in cells.values():
-		owned[cell.owner] += 1
+		if cell.owner != Island.NEUTRAL:
+			owned[cell.owner] += 1
 	return [connected_land_counts(), owned]
 
 func finances(cap: Vector2i) -> Vector2i:
@@ -193,14 +268,25 @@ func finances(cap: Vector2i) -> Vector2i:
 	for p in lands.get(cap, []):
 		var piece = cells[p].piece
 		totals.x += int(not is_tree(piece))
-		if is_unit(piece):
+		if is_unit(piece) and not cells[p].has("commander"):
 			totals.y += WAGES[piece]
+	if cooperative and lands.has(cap) and cells[cap].owner in [0,1]:
+		for cell in cells.values():
+			if cell.get("home",NONE) == cap and is_unit(cell.piece):
+				totals.y += WAGES[cell.piece]
 	return totals
+
+func allied(a: int, b: int) -> bool:
+	return cooperative and ((a == 0 and b == 1) or (a == 1 and b == 0))
+
+func claimable_allied_hex(player: int, target: Vector2i) -> bool:
+	var cell = cells[target]
+	return allied(player,cell.owner) and capitals[target] == NONE and guard(cell.piece) == 0
 
 func defense(target: Vector2i) -> int:
 	var strength = guard(cells[target].piece)
 	for n in adjacent[target]:
-		if cells[n].owner == cells[target].owner:
+		if cells[n].owner == cells[target].owner or allied(cells[n].owner,cells[target].owner):
 			strength = maxi(strength, guard(cells[n].piece))
 	return strength
 
@@ -215,8 +301,8 @@ func legal(kind: String, source: Vector2i, target: Vector2i) -> bool:
 		return false
 	var from = cells[source]
 	var to = cells[target]
-	var cap = capitals[source]
-	if from.owner != active or cap == NONE:
+	var cap = home_village(source) if kind == "move" else capitals[source]
+	if commander(source) != active or cap == NONE:
 		return false
 	if kind == "build":
 		return source == cap and from.cash >= 15 and capitals[target] == cap and to.piece == EMPTY
@@ -227,14 +313,25 @@ func legal(kind: String, source: Vector2i, target: Vector2i) -> bool:
 		rank = PEASANT
 	elif kind != "move" or not is_unit(rank) or from.spent:
 		return false
-	if to.owner == active:
+	var expedition = cooperative and active < 2 and kind == "move"
+	var route = supply_route(cap) if expedition else {}
+	if expedition and not route.has(source):
+		return false
+	if to.owner == active or (expedition and allied(active,to.owner) and capitals[target] != NONE):
+		if expedition and route.has(target) and (to.piece == EMPTY or is_tree(to.piece)):
+			return true
+		if to.owner != active or (is_unit(to.piece) and (commander(target) != active or home_village(target) != cap)):
+			return false
 		if capitals[target] != cap:
 			return false
 		return to.piece == EMPTY or is_tree(to.piece) or to.piece == GRAVE or (is_unit(to.piece) and rank + to.piece <= BARON)
-	if rank <= defense(target):
+	if allied(active,to.owner):
+		if not claimable_allied_hex(active,target):
+			return false
+	elif rank <= defense(target):
 		return false
 	for n in adjacent[target]:
-		if capitals[n] == cap:
+		if capitals[n] == cap or (expedition and route.has(n) and (not allied(active,to.owner) or cells[n].owner == active)):
 			return true
 	return false
 
@@ -255,10 +352,12 @@ func apply(kind: String, source: Vector2i, target: Vector2i) -> bool:
 		to.piece = CASTLE
 		to.spent = false
 		return true
-	var capture = to.owner != active
+	var home = home_village(source)
+	var recipient = destination_owner(kind,target)
+	var capture = to.owner != recipient
 	if capture:
 		# Remember the defense before removing its soldiers or splitting the holding.
-		if defense(target) >= SPEARMAN:
+		if not allied(active,to.owner) and defense(target) >= SPEARMAN:
 			to.breached = true
 		else:
 			to.erase("breached")
@@ -268,24 +367,38 @@ func apply(kind: String, source: Vector2i, target: Vector2i) -> bool:
 		rank = PEASANT
 	else:
 		from.piece = EMPTY
+		clear_commander(from)
 		from.spent = false
 	var combined = not capture and is_unit(to.piece)
 	to.spent = capture or is_tree(to.piece) or to.piece == GRAVE or (combined and to.spent)
 	to.piece = rank + (to.piece if combined else 0)
 	to.erase("young_tree")
 	to.cash = 0
-	to.owner = active
+	clear_commander(to)
+	to.owner = recipient
+	if cooperative and active < 2 and kind == "move":
+		to.commander = active
+		to.home = home
 	if capture:
 		rebuild()
+	if to.has("home") and to.owner == active and to.home == capitals[target]:
+		clear_commander(to)
 	return true
 
 func begin_turn():
 	var growth = {}
 	for p in cells:
 		var cell = cells[p]
+		if cell.has("commander") and cell.commander == active:
+			cell.spent = false
+			if deployment_cut_off(p):
+				cell.piece = GRAVE
+				clear_commander(cell)
+				continue
 		if cell.owner != active:
 			continue
-		cell.spent = false
+		if not cell.has("commander"):
+			cell.spent = false
 		cell.erase("breached")
 		cell.erase("young_tree")
 		if cell.piece == GRAVE:
@@ -303,7 +416,7 @@ func begin_turn():
 				growth[p] = PINE
 			elif adjacent[p].size() < 6 and palms > 0:
 				growth[p] = PALM
-		elif is_unit(cell.piece) and capitals[p] == NONE:
+		elif is_unit(cell.piece) and not cell.has("commander") and capitals[p] == NONE:
 			cell.piece = GRAVE
 	for p in growth:
 		cells[p].piece = growth[p]
@@ -315,13 +428,13 @@ func begin_turn():
 		cells[cap].cash += ledger.x - ledger.y
 		if cells[cap].cash < 0:
 			cells[cap].cash = 0
-			for p in lands[cap]:
-				if is_unit(cells[p].piece):
-					cells[p].piece = GRAVE
+			for p in army(cap):
+				cells[p].piece = GRAVE
+				clear_commander(cells[p])
 
 func can_take_turn(player: int) -> bool:
 	for cell in cells.values():
-		if cell.owner == player and (cell.piece == CAPITAL or is_unit(cell.piece)):
+		if (cell.owner == player and cell.piece == CAPITAL) or (is_unit(cell.piece) and cell.get("commander",cell.owner) == player):
 			return true
 	return false
 
@@ -367,7 +480,7 @@ func accept_surrender():
 func end_turn():
 	for i in players:
 		active = (active + 1) % players
-		if active == 0:
+		if active == first_seat:
 			round_number += 1
 		var eligible = can_take_turn(active)
 		begin_turn()
