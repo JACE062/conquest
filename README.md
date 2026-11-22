@@ -8,7 +8,9 @@ Conquest is a singleplayer hex strategy game inspired by Sean O’Connor’s *Sl
 
 Look for a village flying the gold flag. Select it, choose **Recruit peasant**, then pick a marked hex. A peasant placed on open friendly land can still move that turn. Recruiting directly onto an enemy hex spends its move. Choose **End turn** when you’re ready for the other houses to play.
 
-There are 24 islands in four sizes. Standard is the default difficulty. You can also choose Easy or Hard, and pick your house color. The in-game **How to play** panel covers combat, upkeep, and controls.
+There are 24 islands in four sizes. Standard is the default difficulty. You can also choose Easy or Hard, and pick your house color. The in-game **How to play** panel explains village formation, combat, and upkeep. Under **Controls → Bot turn speed**, choose Slow, Normal, or Fast.
+
+Press **V** to cycle through villages with a ready unit or enough coins to recruit.
 
 On a touch screen, tap a hex to select it, drag to pan, and pinch to zoom. **Fit** shows the entire island.
 

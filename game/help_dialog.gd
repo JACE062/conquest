@@ -75,6 +75,8 @@ func section(parent: Container, heading: String, value: String) -> VBoxContainer
 func build_rules(body: Container):
 	section(body,"Take your first turn",
 		"Select a village flying the gold flag. Choose Recruit and place a peasant on a marked hex. Look for an undefended hex along your border.")
+	section(body,"How villages form",
+		"Two or more of your hexes joined edge to edge form a territory with one village. A lone hex earns no income. If a capture cuts your territory in two, each group of at least two hexes keeps or forms a village. Join two territories and their treasuries combine.")
 	var defense = section(body,"Protect your border",
 		"Each unit, village, and castle defends its own hex and any of the six neighboring hexes held by its house. An attacker must outrank the strongest defender covering the hex.")
 	var example = ui.row(defense,12)
@@ -126,6 +128,16 @@ func build_upkeep(body: Container):
 	paragraph(body,"Two peasants cost %d coins per turn together. Merge them into a spearman and the same village pays %d." % [2 * R.WAGES[R.PEASANT],R.WAGES[R.SPEARMAN]])
 
 func build_controls(body: Container):
+	var pace = ui.row(body,12)
+	ui.label(pace,"Bot turn speed",17,ui.INK)
+	var speed = OptionButton.new()
+	speed.accessibility_name = "Bot turn speed"
+	for choice in ["Slow","Normal","Fast"]:
+		speed.add_item(choice)
+	ui.style_dialog_selector(speed)
+	speed.select(ui.bot_speed)
+	speed.item_selected.connect(ui.set_bot_speed)
+	pace.add_child(speed)
 	section(body,"Move around the island","Drag with one finger to pan and pinch to zoom. With a mouse, right-drag to pan and use the scroll wheel to zoom. Choose Fit to see the whole island.")
 	var keyboard = section(body,"Keyboard","Use the arrow keys, E, and Z to move between hexes. Press Enter to select the highlighted hex.")
 	var grid = GridContainer.new()
@@ -133,7 +145,7 @@ func build_controls(body: Container):
 	grid.add_theme_constant_override("h_separation",18)
 	grid.add_theme_constant_override("v_separation",5)
 	keyboard.add_child(grid)
-	for pair in [["P","Recruit a peasant"],["C","Build a castle"],["U","Undo a move"],["Escape","Cancel an order"],["N","End your turn"]]:
+	for pair in [["P","Recruit a peasant"],["C","Build a castle"],["U","Undo a move"],["Escape","Cancel an order"],["V","Next village"],["N","End your turn"]]:
 		ui.label(grid,pair[0],16,ui.MUTED)
 		ui.label(grid,pair[1],16,ui.INK)
 

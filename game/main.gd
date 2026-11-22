@@ -76,14 +76,31 @@ var modals: Array = []
 var territory_graph = preload("res://game/territory_graph.gd").new()
 var finished = false
 var surrender_pending = false
+const BOT_DELAYS = [Vector2(0.75,0.5),Vector2(0.14,0.085),Vector2(0,0)]
+const PREFERENCES = "user://preferences.cfg"
+var bot_speed = 1
 var delay = 0.0
 var portrait = preload("res://game/portrait_layout.gd").new()
 
 func _ready():
+	var preferences = ConfigFile.new()
+	if FileAccess.file_exists(PREFERENCES) and preferences.load(PREFERENCES) == OK:
+		var speed = preferences.get_value("play","bot_speed",1)
+		if speed is int and speed >= 0 and speed < BOT_DELAYS.size():
+			bot_speed = speed
 	build_ui()
 	get_window().size_changed.connect(portrait.adapt.bind(self))
 	portrait.adapt(self)
 	start(Checkpoint.read())
+
+func set_bot_speed(speed: int):
+	bot_speed = speed
+	delay = minf(delay,BOT_DELAYS[speed].x)
+	var preferences = ConfigFile.new()
+	if FileAccess.file_exists(PREFERENCES):
+		preferences.load(PREFERENCES)
+	preferences.set_value("play","bot_speed",speed)
+	preferences.save(PREFERENCES)
 
 func label(parent, value: String, points: int, color: Color, serif = false) -> Label:
 	var node = Label.new()
@@ -296,12 +313,14 @@ func build_ui():
 	spacer(side,true)
 	var navigation = row(side,6)
 	next_village_button = button(navigation,"Next village",next_village,Color("#e8e2d2"),INK,Color("#babaa5"),44)
-	next_village_button.tooltip_text = "Find a village with a ready unit or enough coins to recruit."
+	next_village_button.tooltip_text = "Next village (V): find a village with a ready unit or enough coins to recruit."
 	undo_button = button(navigation,"Undo move",undo,Color("#e8e2d2"),INK,Color("#babaa5"),40)
+	undo_button.tooltip_text = "Undo move (U): take back your last move or purchase this turn."
 	for control in [next_village_button,undo_button]:
 		control.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	history_button = button(side,"Territory history",show_territory,Color("#e8e2d2"),INK,Color("#babaa5"),40)
 	end_button = button(side,"End turn",request_end_turn,GOLD,INK,Color("#ad8d4d"),50)
+	end_button.tooltip_text = "End turn (N): finish your turn and pass play to the next house."
 	add_child(portrait)
 	portrait.setup(self,root,colors,difficulty,help,restart,standings)
 	configure_dialogs()
@@ -989,7 +1008,7 @@ func next_player():
 		status.text = "Your turn. Select a ready unit or recruit from a territory." if selected != R.NONE else "Your last soldier has fallen. End your turn to watch the remaining houses."
 	else:
 		set_computer_status()
-	delay = 0.14
+	delay = BOT_DELAYS[bot_speed].x
 	check_result()
 	refresh()
 
@@ -1040,7 +1059,7 @@ func _process(delta):
 		selected = game.capitals[order[2]]
 		check_result()
 		refresh()
-		delay = 0.085
+		delay = BOT_DELAYS[bot_speed].y
 
 func house_name(seat: int) -> String:
 	return Island.HOUSES[board.house_ids[seat]]
@@ -1140,6 +1159,7 @@ func _unhandled_key_input(event):
 		KEY_P: choose_purchase("recruit", true)
 		KEY_C: choose_purchase("build", true)
 		KEY_U: undo()
+		KEY_V: next_village()
 		KEY_N: request_end_turn()
 		KEY_F1: show_help()
 		KEY_ESCAPE:

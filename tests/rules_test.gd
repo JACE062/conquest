@@ -446,8 +446,12 @@ func test_end_turn_reminder():
 		"Show village brings its capital into view, selects its treasury, and spends nothing")
 	var eligible = scene.village_work().villages
 	var visited = []
+	shortcut.keycode = KEY_V
 	for i in eligible.size():
-		scene.next_village_button.pressed.emit()
+		if i == 0:
+			scene.next_village_button.pressed.emit()
+		else:
+			root.push_input(shortcut,true)
 		visited.append(scene.selected)
 	expect(visited.size() > 1 and visited.all(func(cap): return visited.count(cap) == 1 and cap in eligible)
 		and scene.selected == target and not prompt.visible and scene.game.cells == previous,
@@ -1255,6 +1259,17 @@ func test_difficulty_selector():
 		var captured = x(0) if tier == AI.Difficulty.EASY else x(3)
 		expect(g.cells[captured].owner == 1 and g.cells[captured].piece == R.KNIGHT, "the computer plays the selected strategy")
 		scene.start()
+	selector.select(selector.get_item_index(AI.Difficulty.STANDARD))
+	var intervals = []
+	for speed in 3:
+		scene.start()
+		scene.bot_speed = speed
+		scene.next_player()
+		var handoff_delay = scene.delay
+		scene._process(2.0)
+		intervals.append(Vector2(handoff_delay,scene.delay))
+	expect(intervals[0].x > intervals[1].x and intervals[1].x > intervals[2].x,"bot speed controls the pause before a house moves")
+	expect(intervals[0].y > intervals[1].y and intervals[1].y > intervals[2].y,"bot speed controls the pause between orders")
 	scene.free()
 
 func test_playable_islands():
